@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"id": "bumpy",
+	"name": "Bumpy",
+	"version": "0.1.0",
+	"minAppVersion": "1.4.0",
+	"description": "Cleans up Markdown in the current note, with a preview before anything is written.",
+	"author": "Ashish Malla",
+	"authorUrl": "https://github.com/im45145v",
 	"isDesktopOnly": false
 }

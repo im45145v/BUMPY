@@ -1,10 +1,15 @@
-# Obsidian community plugin
+# Bumpy
 
 ## Project overview
 
+- Bumpy is a local-first AI sidekick for Obsidian. The vault stays the source of truth.
 - Target: Obsidian Community Plugin (TypeScript → bundled JavaScript).
 - Entry point: `src/main.ts` compiled to `main.js` and loaded by Obsidian.
-- Required release artifacts: `main.js`, `manifest.json`, and optional `styles.css`.
+- Required release artifacts: `main.js`, `manifest.json`, and `styles.css`.
+- Provider clients live under `src/providers/`. Note logic lives under `src/notes/`. Commands stay thin.
+- AI edits require a preview and an explicit apply. Apply writes only the reviewed range in the active editor.
+- Keep API keys out of source, notes, logs, and Git. Plugin data belongs in `data.json`, which is gitignored.
+- Manual testing uses a separate development vault at `/Users/im45145v/Documents/Bumpy Dev`. Never modify `/Users/im45145v/Documents/BUMPY Vault`.
 
 ## Environment & tooling
 
