@@ -10,7 +10,9 @@ import {
 	type SpeechInputEngine,
 } from '../audio/engines';
 import { synthesizeCloud, transcribeCloud } from '../audio/cloud-speech';
+import { browserDeepgramInput } from '../audio/deepgram-audio';
 import { GRADIUM_RECORDING_TYPES } from '../audio/gradium-audio';
+import { deepgramLanguage, webSpeechLanguage } from '../audio/languages';
 import { playAudioBytes } from '../audio/playback';
 import { readAloud } from '../audio/speak';
 import { selectionRange, type CleanupEditor } from '../notes/editor-apply';
@@ -118,7 +120,19 @@ async function speakText(
 
 function speechInput(host: CleanupHost): SpeechInputEngine {
 	if (host.settings.speechInput === 'web-speech') {
-		return createWebSpeechInput(browserSpeechRecognition);
+		const automatic =
+			typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
+		return createWebSpeechInput(
+			browserSpeechRecognition,
+			webSpeechLanguage(host.settings.speechLanguage, automatic),
+		);
+	}
+	if (host.settings.speechInput === 'deepgram') {
+		return browserDeepgramInput(
+			host.settings.speechKeys.deepgram,
+			host.settings.transcriptionModel,
+			deepgramLanguage(host.settings.speechLanguage),
+		);
 	}
 	const mime = host.settings.speechInput === 'gradium' ? gradiumRecordingMime() : '';
 	if (host.settings.speechInput === 'gradium' && mime === '') {
@@ -127,7 +141,7 @@ function speechInput(host: CleanupHost): SpeechInputEngine {
 			listen: () =>
 				Promise.reject(
 					new ProviderError(
-						'Gradium cannot transcribe the recording format from this app. Choose OpenAI, Groq, or Grok for speech to text.',
+						'Gradium cannot transcribe the recording format from this app. Choose OpenAI, Groq, Grok, or Deepgram for speech to text.',
 					),
 				),
 		};

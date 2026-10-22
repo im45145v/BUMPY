@@ -7,6 +7,7 @@ import { selectionRange } from '../notes/editor-apply';
 import { obsidianHttp } from '../providers/obsidian-http';
 import { createGoogleEvent, listGoogleEvents, updateGoogleEvent } from '../tasks/google';
 import { dueReminderKeys, reminderInstant } from '../tasks/calendar';
+import { reminderKey, reminderNotice } from '../tasks/reminders';
 import {
 	formatTaskLine,
 	parseTaskLine,
@@ -61,6 +62,7 @@ export function registerTaskFeatures(
 			void syncCalendar(plugin);
 		},
 	});
+	void remind(plugin);
 	plugin.registerInterval(
 		window.setInterval(() => {
 			void remind(plugin);
@@ -76,16 +78,34 @@ async function remind(plugin: TaskHost): Promise<void> {
 	const items = notes.flatMap((note) =>
 		tasksIn(note.text).flatMap((task) => {
 			if (task.done || !task.due) return [];
-			const at = reminderInstant(task.due, task.time, plugin.settings.reminderHour);
+			const due = task.due;
+			const at = reminderInstant(due, task.time, plugin.settings.reminderHour);
 			if (at === null) return [];
-			return [{ key: `${note.path}:${task.line}:${task.title}`, title: task.title, at }];
+			return [
+				{
+					key: reminderKey(note.path, { due, time: task.time, title: task.title }),
+					title: task.title,
+					time: task.time,
+					at,
+				},
+			];
 		}),
 	);
+	const live = new Set(items.map((item) => item.key));
+	let changed = false;
+	for (const key of plugin.firedReminders) {
+		if (!live.has(key)) {
+			plugin.firedReminders.delete(key);
+			changed = true;
+		}
+	}
 	for (const key of dueReminderKeys(items, Date.now(), plugin.firedReminders)) {
 		plugin.firedReminders.add(key);
-		const title = items.find((item) => item.key === key)?.title ?? 'Task';
-		new Notice(`Reminder: ${title}`);
+		changed = true;
+		const item = items.find((candidate) => candidate.key === key);
+		new Notice(reminderNotice(item?.title ?? 'Task', item?.time ?? null));
 	}
+	if (changed) await saveFired(plugin);
 }
 
 async function syncCalendar(plugin: TaskHost): Promise<void> {
@@ -109,6 +129,7 @@ async function syncCalendar(plugin: TaskHost): Promise<void> {
 					key: `${note.path}:${task.line}:${task.title}`,
 					title: task.title,
 					date: task.due,
+					time: task.time,
 					eventId: task.eventId,
 				};
 				return [{ notePath: note.path, line: task.line, raw: task.raw, tracked }];
@@ -249,13 +270,14 @@ class SyncModal extends Modal {
 						obsidianHttp,
 						this.calendarId,
 						this.token,
-						{ title: action.title, date: action.date },
+						{ title: action.title, date: action.date, time: action.time },
 					);
 					upsertLink(nextLinks, {
 						taskKey: action.taskKey,
 						eventId: created.id,
 						title: action.title,
 						date: action.date,
+						time: action.time,
 					});
 					const wrote = await writeTaskEvent(
 						this.plugin,
@@ -275,18 +297,21 @@ class SyncModal extends Modal {
 						id: action.eventId,
 						title: action.title,
 						date: action.date,
+						time: action.time,
 					});
 					upsertLink(nextLinks, {
 						taskKey: action.taskKey,
 						eventId: action.eventId,
 						title: action.title,
 						date: action.date,
+						time: action.time,
 					});
 					continue;
 				}
 				const wrote = await writeTaskEvent(this.plugin, this.located, action.taskKey, {
 					title: action.title,
 					due: action.date,
+					time: action.time,
 					eventId: action.eventId,
 				});
 				if (!wrote) {
@@ -298,6 +323,7 @@ class SyncModal extends Modal {
 					eventId: action.eventId,
 					title: action.title,
 					date: action.date,
+					time: action.time,
 				});
 			}
 		} catch (error) {
@@ -323,16 +349,20 @@ class SyncModal extends Modal {
 	}
 }
 
+function when(date: string, time: string | null): string {
+	return time ? `${date} at ${time}` : date;
+}
+
 function describe(action: SyncAction): string {
 	switch (action.type) {
 		case 'create-event':
-			return `Create a calendar event for ${action.title} on ${action.date}.`;
+			return `Create a calendar event for ${action.title} on ${when(action.date, action.time)}.`;
 		case 'update-event':
-			return `Update the calendar event to ${action.title} on ${action.date}.`;
+			return `Update the calendar event to ${action.title} on ${when(action.date, action.time)}.`;
 		case 'update-task':
-			return `Update the note task to ${action.title} on ${action.date}.`;
+			return `Update the note task to ${action.title} on ${when(action.date, action.time)}.`;
 		case 'conflict':
-			return `${action.taskTitle} on ${action.taskDate} conflicts with ${action.eventTitle} on ${action.eventDate}.`;
+			return `${action.taskTitle} on ${when(action.taskDate, action.taskTime)} conflicts with ${action.eventTitle} on ${when(action.eventDate, action.eventTime)}.`;
 		case 'absent-event':
 			return `The linked event for ${action.title} on ${action.date} was not in the checked range, so no new event will be created.`;
 		default:
@@ -358,6 +388,11 @@ async function saveLinks(plugin: TaskHost, links: SyncLink[]): Promise<void> {
 	await plugin.saveData({ ...stored, calendarLinks: links });
 }
 
+async function saveFired(plugin: TaskHost): Promise<void> {
+	const stored = ((await plugin.loadData()) ?? {}) as Record<string, unknown>;
+	await plugin.saveData({ ...stored, firedReminders: [...plugin.firedReminders] });
+}
+
 async function writeTaskEvent(
 	plugin: TaskHost,
 	located: ReadonlyArray<{
@@ -367,7 +402,7 @@ async function writeTaskEvent(
 		tracked: TrackedTask;
 	}>,
 	taskKey: string,
-	change: { title?: string; due?: string; eventId: string },
+	change: { title?: string; due?: string; time?: string | null; eventId: string },
 ): Promise<boolean> {
 	const source = located.find((item) => item.tracked.key === taskKey);
 	const task = source ? parseTaskLine(source.raw) : null;
@@ -381,6 +416,7 @@ async function writeTaskEvent(
 			...task,
 			title: change.title ?? task.title,
 			due: change.due ?? task.due,
+			time: 'time' in change ? change.time : task.time,
 			eventId: change.eventId,
 		}),
 	);

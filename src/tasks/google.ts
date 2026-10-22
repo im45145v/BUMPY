@@ -41,7 +41,7 @@ export async function createGoogleEvent(
 	http: HttpClient,
 	calendarId: string,
 	token: string,
-	event: { title: string; date: string },
+	event: { title: string; date: string; time?: string | null; timeZone?: string },
 	signal?: AbortSignal,
 ): Promise<TrackedEvent> {
 	const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
@@ -50,7 +50,7 @@ export async function createGoogleEvent(
 		url,
 		token,
 		'POST',
-		JSON.stringify(eventBody(event)),
+		JSON.stringify(googleEventBody(event)),
 		signal,
 	);
 	const created = readEvent(parseJson(body));
@@ -71,7 +71,7 @@ export async function updateGoogleEvent(
 		url,
 		token,
 		'PUT',
-		JSON.stringify(eventBody(event)),
+		JSON.stringify(googleEventBody(event)),
 		signal,
 	);
 	const updated = readEvent(parseJson(body));
@@ -79,12 +79,63 @@ export async function updateGoogleEvent(
 	return updated;
 }
 
-function eventBody(event: { title: string; date: string }): unknown {
+export function googleEventBody(event: {
+	title: string;
+	date: string;
+	time?: string | null;
+	timeZone?: string;
+}): unknown {
+	const timed = timedRange(event);
+	if (timed) {
+		return {
+			summary: event.title,
+			start: { dateTime: timed.start, timeZone: timed.timeZone },
+			end: { dateTime: timed.end, timeZone: timed.timeZone },
+		};
+	}
 	return {
 		summary: event.title,
 		start: { date: event.date },
 		end: { date: nextDate(event.date) },
 	};
+}
+
+function timedRange(event: {
+	date: string;
+	time?: string | null;
+	timeZone?: string;
+}): { start: string; end: string; timeZone: string } | null {
+	const match = /^(\d{2}):(\d{2})$/.exec(event.time ?? '');
+	if (!match || !/^\d{4}-\d{2}-\d{2}$/.test(event.date)) return null;
+	const hour = Number(match[1]);
+	const minute = Number(match[2]);
+	if (hour > 23 || minute > 59) return null;
+	const startMinute = hour * 60 + minute;
+	const endMinute = startMinute + 30;
+	const endClock = endMinute % (24 * 60);
+	const endDate = shiftDate(event.date, Math.floor(endMinute / (24 * 60)));
+	const endTime = `${String(Math.floor(endClock / 60)).padStart(2, '0')}:${String(endClock % 60).padStart(2, '0')}`;
+	const time = `${match[1]}:${match[2]}`;
+	return {
+		start: `${event.date}T${time}:00`,
+		end: `${endDate}T${endTime}:00`,
+		timeZone: event.timeZone?.trim() || localTimeZone(),
+	};
+}
+
+function shiftDate(iso: string, days: number): string {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+	if (!match || days === 0) return iso;
+	const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function localTimeZone(): string {
+	try {
+		return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+	} catch {
+		return 'UTC';
+	}
 }
 
 function nextDate(iso: string): string {
@@ -195,12 +246,10 @@ function readEvent(value: unknown): TrackedEvent | null {
 		start?: { date?: unknown; dateTime?: unknown };
 	};
 	if (typeof record.id !== 'string' || typeof record.summary !== 'string') return null;
-	const date =
-		typeof record.start?.date === 'string'
-			? record.start.date
-			: typeof record.start?.dateTime === 'string'
-				? record.start.dateTime.slice(0, 10)
-				: '';
+	const allDay = typeof record.start?.date === 'string' ? record.start.date : '';
+	const timed = typeof record.start?.dateTime === 'string' ? record.start.dateTime : '';
+	const clock = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(timed);
+	const date = allDay || clock?.[1] || '';
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-	return { id: record.id, title: record.summary, date };
+	return { id: record.id, title: record.summary, date, time: clock?.[2] ?? null };
 }

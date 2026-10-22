@@ -1,13 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { synthesizeCloud, transcribeCloud } from '../src/audio/cloud-speech';
 import {
+	createDeepgramInput,
+	deepgramListenUrl,
+	type LiveSocket,
+} from '../src/audio/deepgram-audio';
+import { synthesizeWithElevenLabs } from '../src/audio/elevenlabs-audio';
+import {
 	gradiumContentType,
 	readGradiumTranscript,
 	synthesizeWithGradium,
 	transcribeWithGradium,
 } from '../src/audio/gradium-audio';
 import { synthesizeWithGrok, transcribeWithGrok } from '../src/audio/grok-audio';
+import {
+	deepgramLanguage,
+	elevenLanguage,
+	gradiumLanguage,
+	grokLanguage,
+} from '../src/audio/languages';
 import { SPEECH_INPUTS, SPEECH_OUTPUTS } from '../src/audio/speech-catalog';
+import { readVoiceList } from '../src/audio/voices';
 import type { HttpRequest } from '../src/providers/types';
 import { normalizeSettings } from '../src/settings';
 
@@ -19,12 +32,14 @@ describe('speech provider list', () => {
 			'Groq',
 			'Grok',
 			'Gradium',
+			'Deepgram',
 		]);
 		expect(SPEECH_OUTPUTS.map((item) => item.id)).toEqual([
 			'web-speech',
 			'openai',
 			'grok',
 			'gradium',
+			'elevenlabs',
 		]);
 	});
 
@@ -177,7 +192,14 @@ describe('cloud speech routing', () => {
 	it('sends Groq transcription to the Groq audio URL', async () => {
 		const settings = normalizeSettings({
 			speechInput: 'groq',
-			speechKeys: { openai: '', groq: 'gsk-test', grok: '', gradium: '' },
+			speechKeys: {
+				openai: '',
+				groq: 'gsk-test',
+				grok: '',
+				gradium: '',
+				deepgram: '',
+				elevenlabs: '',
+			},
 			transcriptionModel: 'whisper-large-v3-turbo',
 		});
 		let captured: HttpRequest | undefined;
@@ -199,7 +221,14 @@ describe('cloud speech routing', () => {
 	it('sends OpenAI speech to the OpenAI audio URL', async () => {
 		const settings = normalizeSettings({
 			speechOutput: 'openai',
-			speechKeys: { openai: 'sk-tts', groq: '', grok: '', gradium: '' },
+			speechKeys: {
+				openai: 'sk-tts',
+				groq: '',
+				grok: '',
+				gradium: '',
+				deepgram: '',
+				elevenlabs: '',
+			},
 			speechModel: 'tts-1',
 			speechVoice: 'alloy',
 		});
@@ -217,4 +246,187 @@ describe('cloud speech routing', () => {
 		expect(captured?.url).toBe('https://api.openai.com/v1/audio/speech');
 		expect(captured?.body).toContain('"voice":"alloy"');
 	});
+
+	it('sends a chosen language to Grok and Gradium, and French to ElevenLabs v3', async () => {
+		expect(grokLanguage('fr')).toBe('fr');
+		expect(gradiumLanguage('es-MX')).toBe('es');
+		expect(deepgramLanguage('auto')).toBe('multi');
+		expect(elevenLanguage('eleven_v3', 'pt-BR')).toBe('pt');
+		expect(elevenLanguage('eleven_multilingual_v2', 'fr')).toBeUndefined();
+		const settings = normalizeSettings({
+			speechOutput: 'grok',
+			speechLanguage: 'fr',
+			speechKeys: {
+				openai: '',
+				groq: '',
+				grok: 'xai-secret',
+				gradium: '',
+				deepgram: '',
+				elevenlabs: '',
+			},
+			speechVoice: 'ara',
+		});
+		let captured: HttpRequest | undefined;
+		await synthesizeCloud(settings, 'Bonjour', new AbortController().signal, async (request) => {
+			captured = request;
+			return { status: 200, body: '', bytes: new Uint8Array([1]).buffer };
+		});
+		expect(captured?.body).toContain('"language":"fr"');
+		expect(captured?.body).toContain('"voice_id":"ara"');
+		expect(() => gradiumLanguage('ja')).toThrow(/French/);
+	});
 });
+
+describe('ElevenLabs reading', () => {
+	it('posts the note to the voice and hides it from a failed response', async () => {
+		let captured: HttpRequest | undefined;
+		const bytes = new Uint8Array([9, 8]).buffer;
+		const audio = await synthesizeWithElevenLabs(
+			async (request) => {
+				captured = request;
+				return { status: 200, body: '', bytes };
+			},
+			'Read this note',
+			'JBFqnCBsd6RMkjVDRZzb',
+			'eleven_v3',
+			'xi-secret',
+			undefined,
+			'en',
+		);
+		expect(audio).toBe(bytes);
+		expect(captured?.url).toBe(
+			'https://api.elevenlabs.io/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb',
+		);
+		expect(captured?.headers['xi-api-key']).toBe('xi-secret');
+		expect(captured?.headers.Authorization).toBeUndefined();
+		expect(captured?.body).toContain('"model_id":"eleven_v3"');
+		expect(captured?.body).toContain('"language_code":"en"');
+		expect(captured?.body).not.toContain('xi-secret');
+		await expect(
+			synthesizeWithElevenLabs(
+				async () => ({
+					status: 401,
+					body: JSON.stringify({ detail: { message: 'bad xi-secret Read this note' } }),
+				}),
+				'Read this note',
+				'voice',
+				'eleven_v3',
+				'xi-secret',
+			),
+		).rejects.toThrow(/^(?!.*Read this note)(?!.*xi-secret)/);
+	});
+});
+
+describe('Deepgram live words', () => {
+	it('keeps interim words and does not put the key in the socket URL', async () => {
+		expect(deepgramListenUrl('nova-3', 'multi')).toContain('interim_results=true');
+		expect(deepgramListenUrl('nova-3', 'multi')).toContain('mip_opt_out=true');
+		let socket!: FakeSocket;
+		let protocols: string[] = [];
+		const partials: string[] = [];
+		let stopped!: () => void;
+		const stop = new Promise<void>((resolve) => {
+			stopped = resolve;
+		});
+		const pending = createDeepgramInput({
+			apiKey: 'dg-secret',
+			model: 'nova-3',
+			language: 'multi',
+			openSocket: (url, chosen) => {
+				expect(url).not.toContain('dg-secret');
+				protocols = chosen;
+				socket = new FakeSocket();
+				return socket;
+			},
+			mic: {
+				isSupported: () => true,
+				start: async (onChunk) => {
+					onChunk(new Uint8Array([1, 2, 3]).buffer);
+				},
+				stop: async () => {},
+				cancel: () => {},
+			},
+			armCloseTimer: (done) => {
+				done();
+				return () => {};
+			},
+		}).listen({
+			signal: new AbortController().signal,
+			stop,
+			onPartial: (text) => partials.push(text),
+		});
+		await flush();
+		socket.emit(
+			JSON.stringify({
+				type: 'Results',
+				is_final: false,
+				channel: { alternatives: [{ transcript: 'hel' }] },
+			}),
+		);
+		socket.emit(
+			JSON.stringify({
+				type: 'Results',
+				is_final: true,
+				channel: { alternatives: [{ transcript: 'hello vault' }] },
+			}),
+		);
+		expect(partials.at(-1)).toBe('hello vault');
+		stopped();
+		await expect(pending).resolves.toBe('hello vault');
+		expect(protocols).toEqual(['token', 'dg-secret']);
+		expect(socket.sent.some((item) => item instanceof ArrayBuffer)).toBe(true);
+		expect(socket.sent).toContain(JSON.stringify({ type: 'CloseStream' }));
+	});
+});
+
+describe('voice list', () => {
+	it('reads Grok voice names without keeping the API key', () => {
+		expect(
+			readVoiceList(
+				JSON.stringify({
+					voices: [
+						{ voice_id: 'eve', name: 'Eve' },
+						{ voice_id: 'ara', name: 'Ara' },
+					],
+				}),
+				'xai-secret',
+			),
+		).toEqual([
+			{ id: 'eve', name: 'Eve' },
+			{ id: 'ara', name: 'Ara' },
+		]);
+		expect(() => readVoiceList('{"voices":[{"voice_id":"xai-secret"}]}', 'xai-secret')).toThrow(
+			/could not read/i,
+		);
+	});
+});
+
+class FakeSocket implements LiveSocket {
+	sent: Array<string | ArrayBuffer> = [];
+	onopen: (() => void) | null = null;
+	onmessage: ((event: { data: unknown }) => void) | null = null;
+	onerror: (() => void) | null = null;
+	onclose: (() => void) | null = null;
+
+	constructor() {
+		queueMicrotask(() => this.onopen?.());
+	}
+
+	send(data: string | ArrayBuffer): void {
+		this.sent.push(data);
+	}
+
+	close(): void {
+		this.onclose?.();
+	}
+
+	emit(data: string): void {
+		this.onmessage?.({ data });
+	}
+}
+
+function flush(): Promise<void> {
+	return new Promise((resolve) => {
+		queueMicrotask(() => queueMicrotask(() => resolve()));
+	});
+}

@@ -87,7 +87,33 @@
 	opacity: 0.55;
 }
 
-.bumpy-calendar-task {
+.bumpy-calendar-today {
+	border-color: var(--interactive-accent);
+}
+
+.bumpy-due {
+	margin-bottom: 16px;
+}
+
+.bumpy-due-title {
+	font-weight: var(--font-semibold);
+	margin-bottom: 4px;
+}
+
+button.bumpy-calendar-task {
+	display: block;
+	width: 100%;
+	height: auto;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: none;
+	background: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+	text-align: left;
+	cursor: pointer;
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;

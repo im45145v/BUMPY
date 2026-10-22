@@ -1,8 +1,9 @@
-import { Setting, TextComponent } from 'obsidian';
+import { DropdownComponent, Notice, Setting, TextComponent } from 'obsidian';
 import {
 	SPEECH_INPUT_DESC,
 	SPEECH_OUTPUT_DESC,
 } from '../commands/speech-specs';
+import { SPEECH_LANGUAGES, isSpeechLanguage } from '../audio/languages';
 import {
 	SPEECH_INPUTS,
 	SPEECH_OUTPUTS,
@@ -13,6 +14,9 @@ import {
 	speechCloud,
 	type SpeechCloud,
 } from '../audio/speech-catalog';
+import { listSpeechVoices, type SpeechVoice } from '../audio/voices';
+import { obsidianHttp } from '../providers/obsidian-http';
+import { ProviderError } from '../providers/types';
 import type { SettingsOwner } from '../settings';
 
 const KEY_DESC =
@@ -42,14 +46,19 @@ export function speechRows(owner: SettingsOwner): Array<{
 	let modelRow: HTMLElement | undefined;
 	let speechModelRow: HTMLElement | undefined;
 	let voiceRow: HTMLElement | undefined;
+	let voiceMenu: HTMLElement | undefined;
+	let voiceButton: HTMLElement | undefined;
 	const refresh = () => {
 		const input = speechCloud(owner.settings.speechInput);
 		const output = speechCloud(owner.settings.speechOutput);
+		const listed = output === 'grok' || output === 'elevenlabs';
 		show(inputKeyRow, input !== null);
 		show(modelRow, input !== null);
 		show(outputKeyRow, output !== null && output !== input);
-		show(speechModelRow, output === 'openai');
-		show(voiceRow, output === 'openai' || output === 'grok' || output === 'gradium');
+		show(speechModelRow, output === 'openai' || output === 'elevenlabs');
+		show(voiceRow, output === 'openai' || output === 'grok' || output === 'gradium' || output === 'elevenlabs');
+		show(voiceMenu, listed);
+		show(voiceButton, listed);
 		if (input) {
 			inputKey?.setPlaceholder(keyLabel(input));
 			inputKey?.setValue(owner.settings.speechKeys[input]);
@@ -129,7 +138,7 @@ export function speechRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Speech model',
-			desc: 'Used by OpenAI text to speech.',
+			desc: 'OpenAI uses tts-1. ElevenLabs uses eleven_v3 for natural reading. eleven_multilingual_v2 does not use the language setting.',
 			render: (setting) => {
 				speechModelRow = settingRow(setting);
 				addPlain(setting, owner, 'speechModel', 'tts-1');
@@ -138,11 +147,41 @@ export function speechRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Voice',
-			desc: 'OpenAI uses a voice name such as alloy. Grok uses eve. Gradium uses a voice id.',
+			desc: 'Select List voices for Grok or ElevenLabs. OpenAI uses a name such as alloy. Gradium uses a voice id.',
 			render: (setting) => {
 				voiceRow = settingRow(setting);
-				addPlain(setting, owner, 'speechVoice', 'alloy');
+				const field = addPlain(setting, owner, 'speechVoice', 'alloy');
+				const menu = addVoiceMenu(setting, owner, field);
+				voiceMenu = menu.selectEl;
+				setting.addButton((button) => {
+					voiceButton = button.buttonEl;
+					button.setButtonText('List voices').onClick(() => {
+						void loadVoices(owner, button, menu, field);
+					});
+				});
 				refresh();
+			},
+		},
+		{
+			name: 'Language',
+			desc: 'Used by Grok, Gradium, Deepgram, ElevenLabs, and the app recognizer. Automatic lets Grok and Gradium detect the language.',
+			render: (setting) => {
+				setting.addDropdown((dropdown) => {
+					for (const language of SPEECH_LANGUAGES) {
+						dropdown.addOption(language.id, language.label);
+					}
+					dropdown
+						.setValue(
+							isSpeechLanguage(owner.settings.speechLanguage)
+								? owner.settings.speechLanguage
+								: 'auto',
+						)
+						.onChange(async (value) => {
+							if (!isSpeechLanguage(value)) return;
+							owner.settings.speechLanguage = value;
+							await owner.saveSettings();
+						});
+				});
 			},
 		},
 	];
@@ -174,8 +213,10 @@ function addPlain(
 	owner: SettingsOwner,
 	key: 'transcriptionModel' | 'speechModel' | 'speechVoice',
 	placeholder: string,
-): void {
+): TextComponent {
+	let field!: TextComponent;
 	setting.addText((text) => {
+		field = text;
 		text
 			.setPlaceholder(placeholder)
 			.setValue(owner.settings[key])
@@ -184,6 +225,79 @@ function addPlain(
 				await owner.saveSettings();
 			});
 	});
+	return field;
+}
+
+function addVoiceMenu(
+	setting: Setting,
+	owner: SettingsOwner,
+	field: TextComponent,
+): DropdownComponent {
+	let menu!: DropdownComponent;
+	setting.addDropdown((dropdown) => {
+		menu = dropdown;
+		const current = owner.settings.speechVoice.trim();
+		dropdown.addOption(current, current || 'Current voice');
+		dropdown.setValue(current).onChange(async (value) => {
+			if (value === '') return;
+			owner.settings.speechVoice = value;
+			field.setValue(value);
+			await owner.saveSettings();
+		});
+	});
+	return menu;
+}
+
+async function loadVoices(
+	owner: SettingsOwner,
+	button: { setDisabled: (disabled: boolean) => void; setButtonText: (text: string) => void },
+	menu: DropdownComponent,
+	field: TextComponent,
+): Promise<void> {
+	const output = speechCloud(owner.settings.speechOutput);
+	if (output !== 'grok' && output !== 'elevenlabs') return;
+	button.setDisabled(true);
+	button.setButtonText('Listing…');
+	try {
+		const voices = await listSpeechVoices(
+			obsidianHttp,
+			output,
+			owner.settings.speechKeys[output],
+		);
+		if (voices.length === 0) {
+			new Notice('No voices were returned.');
+			return;
+		}
+		fillVoiceMenu(menu, voices, owner.settings.speechVoice);
+		const selected = menu.selectEl.value;
+		if (selected !== '' && selected !== owner.settings.speechVoice) {
+			owner.settings.speechVoice = selected;
+			await owner.saveSettings();
+		}
+		field.setValue(owner.settings.speechVoice);
+	} catch (error) {
+		const message = error instanceof ProviderError ? error.message : 'Could not list voices.';
+		new Notice(message);
+	} finally {
+		button.setDisabled(false);
+		button.setButtonText('List voices');
+	}
+}
+
+function fillVoiceMenu(
+	menu: DropdownComponent,
+	voices: SpeechVoice[],
+	current: string,
+): void {
+	const chosen = current.trim();
+	const options =
+		chosen !== '' && !voices.some((voice) => voice.id === chosen)
+			? [{ id: chosen, name: chosen }, ...voices]
+			: voices;
+	menu.selectEl.replaceChildren();
+	for (const voice of options) menu.addOption(voice.id, voice.name);
+	const next = options.some((voice) => voice.id === chosen) ? chosen : options[0]?.id ?? '';
+	menu.setValue(next);
 }
 
 function show(row: HTMLElement | undefined, visible: boolean): void {

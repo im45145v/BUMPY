@@ -61,9 +61,15 @@ An instruction file is skipped when it is empty, contains a null character, or i
 
 **Speech to text** and **Text to speech** default to **App speech service**. Speech to text uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. Text to speech uses the app's speech synthesis.
 
-The other choices are **OpenAI**, **Groq** (speech to text), **Grok**, and **Gradium**. Each uses its own API key, stored in plugin data on this device and not written into notes. OpenAI and Groq receive the key as a bearer token. Grok uses a bearer token on its voice API. Gradium uses `x-api-key`. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up. Cleaning a transcript uses the cleanup provider.
+The other choices are **OpenAI**, **Groq** (speech to text), **Grok**, **Gradium**, **Deepgram** (speech to text), and **ElevenLabs** (text to speech). Each uses its own API key, stored in plugin data on this device and not written into notes. OpenAI, Groq, Grok, and Deepgram receive the key as a bearer token. Deepgram’s live connection sends the key as a WebSocket protocol, not in the recording URL, and opts out of Deepgram’s model improvement program. Gradium uses `x-api-key`. ElevenLabs uses `xi-api-key`. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up. Cleaning a transcript uses the cleanup provider.
 
-Gradium speech to text needs an Ogg recording. When this app can only record WebM, choose OpenAI, Groq, or Grok for dictation. Gradium can still read notes aloud. Grok speaks with the `eve` voice unless you set another Grok voice id.
+**Deepgram** is the choice for a noisy recording, or when you want the words to appear while you talk. It streams the microphone audio and shows a live transcript. The other cloud speech-to-text providers wait until you stop, then send the recording.
+
+**ElevenLabs** is the choice for more natural reading. It uses the `eleven_v3` model and the George voice until you choose another. **List voices** asks Grok or ElevenLabs for the voices on that key and lets you pick one. Grok no longer has to stay on `eve`.
+
+**Language** replaces automatic detection for Grok and Gradium. Automatic leaves Grok on `auto` and Gradium on `any`. A chosen language is also sent to Deepgram, ElevenLabs models that accept it (`eleven_v3`, Flash v2.5, Turbo v2.5), and the app recognizer. Gradium transcribes English, French, German, Spanish, and Portuguese. `eleven_multilingual_v2` does not take the language setting.
+
+Gradium speech to text needs an Ogg recording. When this app can only record WebM, choose OpenAI, Groq, Grok, or Deepgram for dictation. Gradium can still read notes aloud.
 
 ## Links, tasks, and calendar
 
@@ -73,9 +79,11 @@ Suggested links skip existing links, code, and generic titles such as `readme`. 
 
 Tasks are ordinary Markdown lines, for example `- [ ] Pay rent 📅 2026-10-23`. Phrases such as “next week” or “soon” ask you to pick a date.
 
-Reminders are in-app notices. They start about a minute after Obsidian loads, use the reminder hour when a task has no time, and fire once per session for tasks due within the last 36 hours. Bumpy does not use the operating system’s notification API.
+Reminders are in-app notices. They are checked when Obsidian loads and about once a minute after that. A task with a time is reminded at that time. A task with only a date uses the reminder hour. Each reminder fires once, including after a reload, while the task is still due within the last 36 hours. The fired list is stored in plugin data on this device and is not written into notes. Bumpy does not use the operating system’s notification API.
 
-**Sync calendar** does nothing until **Google calendar ID** and **Google access token** are set. The token is stored in plugin data and is not written into notes. Bumpy does not refresh the token. Events that Bumpy did not create are left alone. A task that already has a linked event is not given a second event when that event is outside the checked range. When a linked task and its event have both changed, the review lists **Keep the note** and **Use the calendar**. A conflict with no choice is skipped.
+**Show calendar** lists open tasks that are due today or earlier, then a month grid. Today is outlined. A task with a time shows that time. Select a task to open its note.
+
+**Sync calendar** does nothing until **Google calendar ID** and **Google access token** are set. The token is stored in plugin data and is not written into notes. Bumpy does not refresh the token. A task with a time becomes a 30-minute event in the local time zone. A task with only a date stays an all-day event. Events that Bumpy did not create are left alone. A task that already has a linked event is not given a second event when that event is outside the checked range. When a linked task and its event have both changed, the review lists **Keep the note** and **Use the calendar**. A conflict with no choice is skipped.
 
 ## Vault questions
 

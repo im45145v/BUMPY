@@ -4,6 +4,7 @@ export const SPEECH_INPUTS = [
 	{ id: 'groq', label: 'Groq' },
 	{ id: 'grok', label: 'Grok' },
 	{ id: 'gradium', label: 'Gradium' },
+	{ id: 'deepgram', label: 'Deepgram' },
 ] as const;
 
 export const SPEECH_OUTPUTS = [
@@ -11,24 +12,27 @@ export const SPEECH_OUTPUTS = [
 	{ id: 'openai', label: 'OpenAI' },
 	{ id: 'grok', label: 'Grok' },
 	{ id: 'gradium', label: 'Gradium' },
+	{ id: 'elevenlabs', label: 'ElevenLabs' },
 ] as const;
 
 export type SpeechInput = (typeof SPEECH_INPUTS)[number]['id'];
 export type SpeechOutput = (typeof SPEECH_OUTPUTS)[number]['id'];
-export type SpeechCloud = 'openai' | 'groq' | 'grok' | 'gradium';
+export type SpeechCloud = 'openai' | 'groq' | 'grok' | 'gradium' | 'deepgram' | 'elevenlabs';
 
 export interface SpeechKeys {
 	openai: string;
 	groq: string;
 	grok: string;
 	gradium: string;
+	deepgram: string;
+	elevenlabs: string;
 }
 
 const INPUT_IDS = new Set<string>(SPEECH_INPUTS.map((item) => item.id));
 const OUTPUT_IDS = new Set<string>(SPEECH_OUTPUTS.map((item) => item.id));
 
 export function emptySpeechKeys(): SpeechKeys {
-	return { openai: '', groq: '', grok: '', gradium: '' };
+	return { openai: '', groq: '', grok: '', gradium: '', deepgram: '', elevenlabs: '' };
 }
 
 export function isSpeechInput(value: string): value is SpeechInput {
@@ -44,10 +48,20 @@ export function speechCloud(route: SpeechInput | SpeechOutput): SpeechCloud | nu
 }
 
 export function keyLabel(provider: SpeechCloud): string {
-	if (provider === 'openai') return 'OpenAI API key';
-	if (provider === 'groq') return 'Groq API key';
-	if (provider === 'grok') return 'Grok API key';
-	return 'Gradium API key';
+	switch (provider) {
+		case 'openai':
+			return 'OpenAI API key';
+		case 'groq':
+			return 'Groq API key';
+		case 'grok':
+			return 'Grok API key';
+		case 'gradium':
+			return 'Gradium API key';
+		case 'deepgram':
+			return 'Deepgram API key';
+		case 'elevenlabs':
+			return 'ElevenLabs API key';
+	}
 }
 
 export function applySpeechDefaults(
@@ -59,6 +73,7 @@ export function applySpeechDefaults(
 		if (route === 'openai') target.transcriptionModel = 'whisper-1';
 		if (route === 'groq') target.transcriptionModel = 'whisper-large-v3-turbo';
 		if (route === 'grok') target.transcriptionModel = 'grok-voice-transcribe-2.0';
+		if (route === 'deepgram') target.transcriptionModel = 'nova-3';
 		return;
 	}
 	if (route === 'openai') {
@@ -67,6 +82,10 @@ export function applySpeechDefaults(
 	}
 	if (route === 'grok') target.speechVoice = 'eve';
 	if (route === 'gradium') target.speechVoice = 'YTpq7expH9539ERJ';
+	if (route === 'elevenlabs') {
+		target.speechModel = 'eleven_v3';
+		target.speechVoice = 'JBFqnCBsd6RMkjVDRZzb';
+	}
 }
 
 export function normalizeSpeechSetup(

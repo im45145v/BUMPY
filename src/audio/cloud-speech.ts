@@ -1,7 +1,14 @@
 import type { BumpySettings } from '../settings';
 import { ProviderError, type HttpClient } from '../providers/types';
+import { synthesizeWithElevenLabs } from './elevenlabs-audio';
 import { transcribeWithGradium, synthesizeWithGradium } from './gradium-audio';
 import { synthesizeWithGrok, transcribeWithGrok } from './grok-audio';
+import {
+	elevenLanguage,
+	gradiumLanguage,
+	gradiumRewrite,
+	grokLanguage,
+} from './languages';
 import { synthesizeSpeech, transcribeAudio } from './openai-audio';
 import { speechCloud, type SpeechCloud } from './speech-catalog';
 
@@ -41,7 +48,17 @@ export async function transcribeCloud(
 			signal,
 		);
 	}
-	return transcribeWithGradium(http, audio, mime, key, signal);
+	if (route === 'deepgram') {
+		throw new ProviderError('Deepgram transcribes while you talk. Start dictation again.');
+	}
+	return transcribeWithGradium(
+		http,
+		audio,
+		mime,
+		key,
+		signal,
+		gradiumLanguage(settings.speechLanguage),
+	);
 }
 
 export async function synthesizeCloud(
@@ -51,7 +68,7 @@ export async function synthesizeCloud(
 	http: HttpClient,
 ): Promise<SpokenAudio> {
 	const route = speechCloud(settings.speechOutput);
-	if (!route || route === 'groq') {
+	if (!route || route === 'groq' || route === 'deepgram') {
 		throw new ProviderError('Choose a text to speech provider.');
 	}
 	const key = settings.speechKeys[route];
@@ -69,12 +86,40 @@ export async function synthesizeCloud(
 	if (route === 'grok') {
 		return {
 			mime: 'audio/mpeg',
-			bytes: await synthesizeWithGrok(http, text, settings.speechVoice, key, signal),
+			bytes: await synthesizeWithGrok(
+				http,
+				text,
+				settings.speechVoice,
+				key,
+				signal,
+				grokLanguage(settings.speechLanguage),
+			),
+		};
+	}
+	if (route === 'elevenlabs') {
+		return {
+			mime: 'audio/mpeg',
+			bytes: await synthesizeWithElevenLabs(
+				http,
+				text,
+				settings.speechVoice,
+				settings.speechModel,
+				key,
+				signal,
+				elevenLanguage(settings.speechModel, settings.speechLanguage),
+			),
 		};
 	}
 	return {
 		mime: 'audio/wav',
-		bytes: await synthesizeWithGradium(http, text, settings.speechVoice, key, signal),
+		bytes: await synthesizeWithGradium(
+			http,
+			text,
+			settings.speechVoice,
+			key,
+			signal,
+			gradiumRewrite(settings.speechLanguage),
+		),
 	};
 }
 

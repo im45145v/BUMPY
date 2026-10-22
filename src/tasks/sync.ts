@@ -4,6 +4,7 @@ export interface TrackedTask {
 	key: string;
 	title: string;
 	date: string;
+	time?: string | null;
 	eventId: string | null;
 }
 
@@ -11,6 +12,7 @@ export interface TrackedEvent {
 	id: string;
 	title: string;
 	date: string;
+	time?: string | null;
 }
 
 export interface SyncLink {
@@ -18,22 +20,46 @@ export interface SyncLink {
 	eventId: string;
 	title: string;
 	date: string;
+	time?: string | null;
 }
 
 export type SyncAction =
-	| { type: 'create-event'; taskKey: string; title: string; date: string }
-	| { type: 'update-event'; eventId: string; title: string; date: string; taskKey: string }
-	| { type: 'update-task'; taskKey: string; eventId: string; title: string; date: string }
+	| { type: 'create-event'; taskKey: string; title: string; date: string; time: string | null }
+	| {
+			type: 'update-event';
+			eventId: string;
+			title: string;
+			date: string;
+			time: string | null;
+			taskKey: string;
+	  }
+	| {
+			type: 'update-task';
+			taskKey: string;
+			eventId: string;
+			title: string;
+			date: string;
+			time: string | null;
+	  }
 	| {
 			type: 'conflict';
 			taskKey: string;
 			eventId: string;
 			taskTitle: string;
 			taskDate: string;
+			taskTime: string | null;
 			eventTitle: string;
 			eventDate: string;
+			eventTime: string | null;
 	  }
-	| { type: 'remember'; taskKey: string; eventId: string; title: string; date: string }
+	| {
+			type: 'remember';
+			taskKey: string;
+			eventId: string;
+			title: string;
+			date: string;
+			time: string | null;
+	  }
 	| { type: 'absent-event'; taskKey: string; eventId: string; title: string; date: string }
 	| { type: 'unchanged'; taskKey: string };
 
@@ -77,6 +103,7 @@ export function planSync(
 				taskKey: task.key,
 				title: task.title,
 				date: task.date,
+				time: clock(task),
 			});
 			continue;
 		}
@@ -87,11 +114,16 @@ export function planSync(
 				eventId: event.id,
 				title: task.title,
 				date: task.date,
+				time: clock(task),
 			});
 			continue;
 		}
-		const taskChanged = task.title !== link.title || task.date !== link.date;
-		const eventChanged = event.title !== link.title || event.date !== link.date;
+		const taskChanged =
+			task.title !== link.title || task.date !== link.date || timeChanged(task, event, link);
+		const eventChanged =
+			event.title !== link.title ||
+			event.date !== link.date ||
+			recordedTimeChanged(event, link);
 		if (taskChanged && eventChanged) {
 			actions.push(resolveConflict(task, event, policy));
 			continue;
@@ -102,6 +134,7 @@ export function planSync(
 				eventId: event.id,
 				title: task.title,
 				date: task.date,
+				time: clock(task),
 				taskKey: task.key,
 			});
 			continue;
@@ -113,6 +146,7 @@ export function planSync(
 				eventId: event.id,
 				title: event.title,
 				date: event.date,
+				time: clock(event),
 			});
 			continue;
 		}
@@ -131,6 +165,7 @@ export function chooseConflict(
 			eventId: action.eventId,
 			title: action.taskTitle,
 			date: action.taskDate,
+			time: action.taskTime,
 			taskKey: action.taskKey,
 		};
 	}
@@ -140,6 +175,7 @@ export function chooseConflict(
 		eventId: action.eventId,
 		title: action.eventTitle,
 		date: action.eventDate,
+		time: action.eventTime,
 	};
 }
 
@@ -154,6 +190,7 @@ function resolveConflict(
 			eventId: event.id,
 			title: task.title,
 			date: task.date,
+			time: clock(task),
 			taskKey: task.key,
 		};
 	}
@@ -164,6 +201,7 @@ function resolveConflict(
 			eventId: event.id,
 			title: event.title,
 			date: event.date,
+			time: clock(event),
 		};
 	}
 	return {
@@ -172,7 +210,35 @@ function resolveConflict(
 		eventId: event.id,
 		taskTitle: task.title,
 		taskDate: task.date,
+		taskTime: clock(task),
 		eventTitle: event.title,
 		eventDate: event.date,
+		eventTime: clock(event),
 	};
+}
+
+function clock(value: { time?: string | null }): string | null {
+	return value.time ?? null;
+}
+
+/**
+ * Links saved before times were tracked have no `time` field.
+ * A task clock that the event does not have yet updates the event.
+ * Once a link stores `time`, each side is compared with that stored clock.
+ */
+function timeChanged(
+	task: { time?: string | null },
+	event: { time?: string | null },
+	link: { time?: string | null },
+): boolean {
+	if (!('time' in link)) return clock(task) !== clock(event);
+	return clock(task) !== clock(link);
+}
+
+function recordedTimeChanged(
+	event: { time?: string | null },
+	link: { time?: string | null },
+): boolean {
+	if (!('time' in link)) return false;
+	return clock(event) !== clock(link);
 }

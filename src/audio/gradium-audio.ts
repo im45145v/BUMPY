@@ -56,12 +56,13 @@ export async function transcribeWithGradium(
 	mime: string,
 	apiKey: string,
 	signal?: AbortSignal,
+	language = 'any',
 ): Promise<string> {
 	const key = requireKey(apiKey);
 	const contentType = gradiumContentType(mime);
 	if (!contentType) {
 		throw new ProviderError(
-			'Gradium cannot transcribe the recording format from this app. Choose OpenAI, Groq, or Grok for speech to text.',
+			'Gradium cannot transcribe the recording format from this app. Choose OpenAI, Groq, Grok, or Deepgram for speech to text.',
 		);
 	}
 	if (audio.byteLength === 0) throw new Error('No speech was heard.');
@@ -69,7 +70,7 @@ export async function transcribeWithGradium(
 		throw new Error('This recording is too large to transcribe.');
 	}
 	const url = new URL(STT_URL);
-	url.searchParams.set('json_config', JSON.stringify({ language: 'any' }));
+	url.searchParams.set('json_config', JSON.stringify({ language: language.trim() || 'any' }));
 	const response = await sendGradium(
 		http,
 		url.toString(),
@@ -90,18 +91,21 @@ export async function synthesizeWithGradium(
 	voice: string,
 	apiKey: string,
 	signal?: AbortSignal,
+	rewriteRules?: string | null,
 ): Promise<ArrayBuffer> {
 	const key = requireKey(apiKey);
+	const payload: Record<string, unknown> = {
+		text,
+		voice_id: voice.trim() || 'YTpq7expH9539ERJ',
+		output_format: 'wav',
+		only_audio: true,
+	};
+	if (rewriteRules) payload.json_config = { rewrite_rules: rewriteRules };
 	const response = await sendGradium(
 		http,
 		TTS_URL,
 		key,
-		JSON.stringify({
-			text,
-			voice_id: voice.trim() || 'YTpq7expH9539ERJ',
-			output_format: 'wav',
-			only_audio: true,
-		}),
+		JSON.stringify(payload),
 		'application/json',
 		signal,
 	);

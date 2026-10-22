@@ -36,10 +36,11 @@ export interface RecognitionLike {
 
 export function createWebSpeechInput(
 	factory: () => RecognitionLike | null,
+	language = 'en-US',
 ): SpeechInputEngine {
 	return {
 		isSupported: () => factory() !== null,
-		listen: (options) => listenWithRecognition(factory, options),
+		listen: (options) => listenWithRecognition(factory, options, language),
 	};
 }
 
@@ -57,12 +58,13 @@ export function browserSpeechRecognition(): RecognitionLike | null {
 async function listenWithRecognition(
 	factory: () => RecognitionLike | null,
 	options: ListenOptions,
+	language: string,
 ): Promise<string> {
 	const recognition = factory();
 	if (!recognition) {
 		throw new Error('Speech recognition is not available in this app.');
 	}
-	recognition.lang = 'en-US';
+	recognition.lang = language || 'en-US';
 	recognition.continuous = true;
 	recognition.interimResults = true;
 

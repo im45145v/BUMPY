@@ -45,6 +45,7 @@ export async function synthesizeWithGrok(
 	voice: string,
 	apiKey: string,
 	signal?: AbortSignal,
+	language = 'auto',
 ): Promise<ArrayBuffer> {
 	const key = requireKey(apiKey, 'Grok');
 	const response = await sendGrok(
@@ -54,7 +55,7 @@ export async function synthesizeWithGrok(
 		JSON.stringify({
 			text,
 			voice_id: voice.trim() || 'eve',
-			language: 'auto',
+			language: language.trim() || 'auto',
 		}),
 		'application/json',
 		signal,

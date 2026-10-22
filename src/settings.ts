@@ -1,4 +1,6 @@
+import { isSpeechLanguage } from './audio/languages';
 import {
+	emptySpeechKeys,
 	normalizeSpeechSetup,
 	type SpeechInput,
 	type SpeechKeys,
@@ -29,6 +31,7 @@ export interface BumpySettings {
 	transcriptionModel: string;
 	speechModel: string;
 	speechVoice: string;
+	speechLanguage: string;
 	excludedFolders: string;
 	calendarConflict: 'ask' | 'vault-wins' | 'calendar-wins';
 	googleAccessToken: string;
@@ -51,10 +54,11 @@ export const DEFAULT_SETTINGS: BumpySettings = {
 	apiKey: '',
 	speechInput: 'web-speech',
 	speechOutput: 'web-speech',
-	speechKeys: { openai: '', groq: '', grok: '', gradium: '' },
+	speechKeys: emptySpeechKeys(),
 	transcriptionModel: 'whisper-1',
 	speechModel: 'tts-1',
 	speechVoice: 'alloy',
+	speechLanguage: 'auto',
 	excludedFolders: '.trash',
 	calendarConflict: 'ask',
 	googleAccessToken: '',
@@ -102,6 +106,7 @@ export function normalizeSettings(
 		),
 		speechModel: textSetting(source.speechModel, DEFAULT_SETTINGS.speechModel),
 		speechVoice: textSetting(source.speechVoice, DEFAULT_SETTINGS.speechVoice),
+		speechLanguage: languageSetting(source.speechLanguage),
 		excludedFolders: textSetting(
 			source.excludedFolders,
 			DEFAULT_SETTINGS.excludedFolders,
@@ -119,6 +124,10 @@ export function normalizeSettings(
 		journalDays: daySetting(source.journalDays),
 		features: normalizeFeatures(source.features),
 	};
+}
+
+function languageSetting(value: unknown): string {
+	return typeof value === 'string' && isSpeechLanguage(value) ? value : 'auto';
 }
 
 function searchSetting(value: unknown): BumpySettings['searchProvider'] {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildMonth, dueReminderKeys, reminderInstant } from '../src/tasks/calendar';
-import { createGoogleEvent, listGoogleEvents } from '../src/tasks/google';
+import { buildMonth, dueReminderKeys, dueTasks, reminderInstant } from '../src/tasks/calendar';
+import { createGoogleEvent, googleEventBody, listGoogleEvents } from '../src/tasks/google';
+import { readFiredReminders, reminderKey } from '../src/tasks/reminders';
 import {
 	appendTask,
 	formatTaskLine,
@@ -86,6 +87,37 @@ describe('calendar and reminders', () => {
 		const key = 'rent';
 		expect(dueReminderKeys([{ key, at }], at + 1000, new Set())).toEqual([key]);
 		expect(dueReminderKeys([{ key, at }], at + 1000, new Set([key]))).toEqual([]);
+		expect(reminderKey('Tasks.md', { due: '2026-10-23', time: '15:00', title: 'Stretch' })).toBe(
+			'Tasks.md:2026-10-23:15:00:Stretch',
+		);
+		expect(
+			dueTasks(
+				[
+					{
+						title: 'Later',
+						done: false,
+						due: '2026-10-24',
+						time: null,
+					},
+					{
+						title: 'Stretch',
+						done: false,
+						due: '2026-10-22',
+						time: '15:00',
+					},
+					{
+						title: 'Done',
+						done: true,
+						due: '2026-10-22',
+						time: null,
+					},
+				],
+				'2026-10-22',
+			).map((task) => task.title),
+		).toEqual(['Stretch']);
+		expect(readFiredReminders({ firedReminders: ['Tasks.md:2026-10-23::Pay rent', 4] })).toEqual([
+			'Tasks.md:2026-10-23::Pay rent',
+		]);
 	});
 });
 
@@ -152,7 +184,12 @@ describe('calendar sync', () => {
 			'sk-calendar-secret',
 			{ title: 'Pay rent', date: '2026-10-23' },
 		);
-		expect(created).toEqual({ id: 'evt-1', title: 'Pay rent', date: '2026-10-23' });
+		expect(created).toEqual({
+			id: 'evt-1',
+			title: 'Pay rent',
+			date: '2026-10-23',
+			time: null,
+		});
 		expect(captured?.url).toContain('/calendars/primary/events');
 		expect(captured?.url).not.toContain('sk-calendar-secret');
 		expect(typeof captured?.body).toBe('string');
@@ -219,5 +256,57 @@ describe('calendar sync', () => {
 		expect(urls).toHaveLength(2);
 		expect(urls[1]).toContain('pageToken=page-2');
 		expect(urls[0]).not.toContain('token');
+	});
+
+	it('sends a timed task as a 30-minute event and reads the clock back', () => {
+		expect(
+			googleEventBody({
+				title: 'Stretch',
+				date: '2026-10-23',
+				time: '23:45',
+				timeZone: 'UTC',
+			}),
+		).toEqual({
+			summary: 'Stretch',
+			start: { dateTime: '2026-10-23T23:45:00', timeZone: 'UTC' },
+			end: { dateTime: '2026-10-24T00:15:00', timeZone: 'UTC' },
+		});
+	});
+
+	it('treats a changed time as a task change', () => {
+		const task = {
+			key: 'stretch',
+			title: 'Stretch',
+			date: '2026-10-23',
+			time: '16:00',
+			eventId: 'evt-1',
+		};
+		const event = { id: 'evt-1', title: 'Stretch', date: '2026-10-23', time: '15:00' };
+		const link = {
+			taskKey: 'stretch',
+			eventId: 'evt-1',
+			title: 'Stretch',
+			date: '2026-10-23',
+			time: '15:00',
+		};
+		expect(planSync([task], [event], [link], 'ask')[0]).toMatchObject({
+			type: 'update-event',
+			time: '16:00',
+		});
+		expect(
+			planSync(
+				[{ ...task, time: '15:00' }],
+				[{ ...event, time: null }],
+				[
+					{
+						taskKey: 'stretch',
+						eventId: 'evt-1',
+						title: 'Stretch',
+						date: '2026-10-23',
+					},
+				],
+				'ask',
+			)[0]?.type,
+		).toBe('update-event');
 	});
 });

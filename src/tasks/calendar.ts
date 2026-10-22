@@ -1,38 +1,55 @@
 import type { MarkdownTask } from './parse';
 
-export interface CalendarCell {
+export interface CalendarCell<T extends MarkdownTask = MarkdownTask> {
 	iso: string;
 	inMonth: boolean;
-	tasks: MarkdownTask[];
+	tasks: T[];
 }
 
 /** Monday-first month grid, always six weeks. */
-export function buildMonth(
+export function buildMonth<T extends MarkdownTask>(
 	year: number,
 	month: number,
-	tasks: readonly MarkdownTask[],
-): CalendarCell[] {
+	tasks: readonly T[],
+): CalendarCell<T>[] {
 	const first = new Date(year, month - 1, 1);
 	const lead = (first.getDay() + 6) % 7;
 	const start = new Date(year, month - 1, 1 - lead);
-	const byDate = new Map<string, MarkdownTask[]>();
+	const byDate = new Map<string, T[]>();
 	for (const task of tasks) {
 		if (!task.due) continue;
 		const list = byDate.get(task.due) ?? [];
 		list.push(task);
 		byDate.set(task.due, list);
 	}
-	const cells: CalendarCell[] = [];
+	const cells: CalendarCell<T>[] = [];
 	for (let offset = 0; offset < 42; offset++) {
 		const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset);
-		const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+		const iso = localIso(date);
 		cells.push({
 			iso,
 			inMonth: date.getMonth() === month - 1,
-			tasks: byDate.get(iso) ?? [],
+			tasks: byDate.get(iso) ?? ([] as T[]),
 		});
 	}
 	return cells;
+}
+
+export function localIso(date: Date): string {
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+export function dueTasks<T extends { done: boolean; due: string | null; time: string | null }>(
+	tasks: readonly T[],
+	today: string,
+): T[] {
+	return tasks
+		.filter((task) => !task.done && task.due !== null && task.due <= today)
+		.sort((left, right) => {
+			const byDate = (left.due ?? '').localeCompare(right.due ?? '');
+			if (byDate !== 0) return byDate;
+			return (left.time ?? '').localeCompare(right.time ?? '');
+		});
 }
 
 export function reminderInstant(

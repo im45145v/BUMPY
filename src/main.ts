@@ -3,6 +3,7 @@ import { registerCommands } from './commands';
 import { registerKnowledge } from './commands/knowledge';
 import { registerTaskFeatures } from './commands/tasks';
 import { RequestScope } from './requests/scope';
+import { readFiredReminders } from './tasks/reminders';
 import { normalizeSettings, type BumpySettings } from './settings';
 import { BumpySettingTab } from './ui/settings-tab';
 
@@ -24,9 +25,10 @@ export default class BumpyPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = normalizeSettings(
-			(await this.loadData()) as Partial<BumpySettings>,
-		);
+		const stored: unknown = await this.loadData();
+		this.settings = normalizeSettings(stored as Partial<BumpySettings>);
+		this.firedReminders.clear();
+		for (const key of readFiredReminders(stored)) this.firedReminders.add(key);
 	}
 
 	async saveSettings(): Promise<void> {
