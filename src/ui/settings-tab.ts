@@ -1,0 +1,223 @@
+import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { checkProvider, formatProviderCheck } from '../providers/models';
+import { obsidianHttp } from '../providers/obsidian-http';
+import {
+	PRESET_IDS,
+	PROVIDER_PRESETS,
+	isProviderPreset,
+} from '../providers/presets';
+import {
+	type BumpySettings,
+	type SettingsOwner,
+} from '../settings';
+import { knowledgeRows, renderKnowledgeSettings } from './knowledge-settings';
+import { renderSpeechSettings, speechRows } from './speech-settings';
+import { renderTaskSettings, taskRows } from './task-settings';
+
+export class BumpySettingTab extends PluginSettingTab {
+	private readonly owner: SettingsOwner;
+
+	constructor(app: App, plugin: Plugin & SettingsOwner) {
+		super(app, plugin);
+		this.owner = plugin;
+	}
+
+	// Obsidian 1.13+ uses this for settings search and skips display().
+	// The API key stays a custom row so the field can be a password input.
+	getSettingDefinitions(): SettingDefinition[] {
+		return [
+			{
+				name: 'Provider',
+				desc: PROVIDER_DESC,
+				render: (setting) => this.addPreset(setting),
+			},
+			{
+				name: 'Provider URL',
+				desc: PROVIDER_URL_DESC,
+				control: {
+					type: 'text',
+					key: 'baseUrl',
+					placeholder: 'Base URL',
+				},
+			},
+			{
+				name: 'Model',
+				desc: 'Name expected by the provider.',
+				control: {
+					type: 'text',
+					key: 'model',
+					placeholder: 'Model name',
+				},
+			},
+			{
+				name: 'API key',
+				desc: API_KEY_DESC,
+				render: (setting) => this.addApiKey(setting),
+			},
+			{
+				name: 'Excluded folders',
+				desc: 'Comma-separated folders to skip for links, tasks, and the index.',
+				control: {
+					type: 'text',
+					key: 'excludedFolders',
+					placeholder: '.trash',
+				},
+			},
+			{
+				name: 'Connection',
+				desc: 'Asks the provider for its model list. The API key is not shown.',
+				render: (setting) => this.addConnectionCheck(setting),
+			},
+			...speechRows(this.owner),
+			...taskRows(this.owner),
+			...knowledgeRows(this.owner),
+		];
+	}
+
+	// Obsidian before 1.13 renders this instead.
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+
+		this.addPreset(
+			new Setting(containerEl).setName('Provider').setDesc(PROVIDER_DESC),
+		);
+
+		new Setting(containerEl)
+			.setName('Provider URL')
+			.setDesc(PROVIDER_URL_DESC)
+			.addText((text) =>
+				text
+					.setPlaceholder('Base URL')
+					.setValue(this.owner.settings.baseUrl)
+					.onChange(async (value) => {
+						this.owner.settings.baseUrl = value;
+						await this.owner.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Model')
+			.setDesc('Name expected by the provider.')
+			.addText((text) =>
+				text
+					.setPlaceholder('Model name')
+					.setValue(this.owner.settings.model)
+					.onChange(async (value) => {
+						this.owner.settings.model = value;
+						await this.owner.saveSettings();
+					}),
+			);
+
+		this.addApiKey(
+			new Setting(containerEl).setName('API key').setDesc(API_KEY_DESC),
+		);
+
+		new Setting(containerEl)
+			.setName('Excluded folders')
+			.setDesc(
+				'Comma-separated folders to skip for links, tasks, and the index.',
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder('.trash')
+					.setValue(this.owner.settings.excludedFolders)
+					.onChange(async (value) => {
+						this.owner.settings.excludedFolders = value;
+						await this.owner.saveSettings();
+					}),
+			);
+
+		this.addConnectionCheck(
+			new Setting(containerEl)
+				.setName('Connection')
+				.setDesc('Asks the provider for its model list. The API key is not shown.'),
+		);
+		renderSpeechSettings(containerEl, this.owner);
+		renderTaskSettings(containerEl, this.owner);
+		renderKnowledgeSettings(containerEl, this.owner);
+	}
+
+	private addPreset(setting: Setting): void {
+		setting.addDropdown((dropdown) => {
+			for (const id of PRESET_IDS) {
+				dropdown.addOption(id, PROVIDER_PRESETS[id].label);
+			}
+			dropdown.setValue(this.owner.settings.preset).onChange(async (value) => {
+				if (!isProviderPreset(value)) return;
+				this.owner.settings.preset = value;
+				const url = PROVIDER_PRESETS[value].baseUrl;
+				if (url) this.owner.settings.baseUrl = url;
+				await this.owner.saveSettings();
+				this.display();
+			});
+		});
+	}
+
+	private addApiKey(setting: Setting): void {
+		setting.addText((text) => {
+			text.inputEl.type = 'password';
+			text.inputEl.autocomplete = 'off';
+			text
+				.setPlaceholder('Optional')
+				.setValue(this.owner.settings.apiKey)
+				.onChange(async (value) => {
+					this.owner.settings.apiKey = value;
+					await this.owner.saveSettings();
+				});
+		});
+	}
+
+	private addConnectionCheck(setting: Setting): void {
+		setting.addButton((button) => {
+			button.setButtonText('Check connection').onClick(() => {
+				void this.checkConnection();
+			});
+		});
+	}
+
+	private async checkConnection(): Promise<void> {
+		const controller = this.owner.requests.start();
+		const notice = new Notice('Checking the provider…', 0);
+		try {
+			const result = await checkProvider(
+				obsidianHttp,
+				this.owner.settings.baseUrl,
+				this.owner.settings.apiKey,
+				controller.signal,
+			);
+			if (controller.signal.aborted) return;
+			new Notice(formatProviderCheck(result));
+		} finally {
+			notice.hide();
+			this.owner.requests.finish(controller);
+		}
+	}
+}
+
+const PROVIDER_DESC =
+	'Choosing a provider fills its usual URL. Choose Custom to keep the URL as you typed it.';
+
+const PROVIDER_URL_DESC =
+	'OpenAI-compatible base URL. Leave the API key empty for a local server that does not require one.';
+
+const API_KEY_DESC =
+	"Stored in this vault's plugin data on this device. It is not written into notes.";
+
+interface TextControlDefinition {
+	name: string;
+	desc: string;
+	control: {
+		type: 'text';
+		key: keyof BumpySettings;
+		placeholder: string;
+	};
+}
+
+interface RenderedSettingDefinition {
+	name: string;
+	desc: string;
+	render: (setting: Setting) => void;
+}
+
+type SettingDefinition = TextControlDefinition | RenderedSettingDefinition;

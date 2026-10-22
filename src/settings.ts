@@ -1,140 +1,135 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {
+	PROVIDER_PRESETS,
+	inferPreset,
+	isProviderPreset,
+	type ProviderPreset,
+} from './providers/presets';
+import type { RequestScope } from './requests/scope';
+
+export type SpeechRoute = 'web-speech' | 'openai-audio';
 
 export interface BumpySettings {
+	preset: ProviderPreset;
 	baseUrl: string;
 	model: string;
 	apiKey: string;
+	speechInput: SpeechRoute;
+	speechOutput: SpeechRoute;
+	transcriptionModel: string;
+	speechModel: string;
+	speechVoice: string;
+	excludedFolders: string;
+	calendarConflict: 'ask' | 'vault-wins' | 'calendar-wins';
+	googleAccessToken: string;
+	googleCalendarId: string;
+	reminderHour: number;
+	embeddings: 'local' | 'provider';
+	embeddingModel: string;
+	searchProvider: 'off' | 'searxng' | 'brave';
+	searchUrl: string;
+	searchApiKey: string;
+	journalFolder: string;
+	journalDays: number;
 }
 
 export const DEFAULT_SETTINGS: BumpySettings = {
-	baseUrl: 'http://127.0.0.1:11434/v1',
+	preset: 'ollama',
+	baseUrl: PROVIDER_PRESETS.ollama.baseUrl,
 	model: '',
 	apiKey: '',
+	speechInput: 'web-speech',
+	speechOutput: 'web-speech',
+	transcriptionModel: 'whisper-1',
+	speechModel: 'tts-1',
+	speechVoice: 'alloy',
+	excludedFolders: '.trash',
+	calendarConflict: 'ask',
+	googleAccessToken: '',
+	googleCalendarId: '',
+	reminderHour: 9,
+	embeddings: 'local',
+	embeddingModel: 'nomic-embed-text',
+	searchProvider: 'off',
+	searchUrl: '',
+	searchApiKey: '',
+	journalFolder: 'Journal',
+	journalDays: 7,
 };
+
+export function normalizeSettings(
+	partial: Partial<BumpySettings> | null | undefined,
+): BumpySettings {
+	const source = partial ?? {};
+	const baseUrl = textSetting(source.baseUrl, DEFAULT_SETTINGS.baseUrl);
+	const preset =
+		typeof source.preset === 'string' && isProviderPreset(source.preset)
+			? source.preset
+			: inferPreset(baseUrl);
+	return {
+		preset,
+		baseUrl,
+		model: textSetting(source.model, ''),
+		apiKey: textSetting(source.apiKey, ''),
+		speechInput: speechRoute(source.speechInput, 'web-speech'),
+		speechOutput: speechRoute(source.speechOutput, 'web-speech'),
+		transcriptionModel: textSetting(
+			source.transcriptionModel,
+			DEFAULT_SETTINGS.transcriptionModel,
+		),
+		speechModel: textSetting(source.speechModel, DEFAULT_SETTINGS.speechModel),
+		speechVoice: textSetting(source.speechVoice, DEFAULT_SETTINGS.speechVoice),
+		excludedFolders: textSetting(
+			source.excludedFolders,
+			DEFAULT_SETTINGS.excludedFolders,
+		),
+		calendarConflict: conflictSetting(source.calendarConflict),
+		googleAccessToken: textSetting(source.googleAccessToken, ''),
+		googleCalendarId: textSetting(source.googleCalendarId, ''),
+		reminderHour: hourSetting(source.reminderHour),
+		embeddings: source.embeddings === 'provider' ? 'provider' : 'local',
+		embeddingModel: textSetting(source.embeddingModel, DEFAULT_SETTINGS.embeddingModel),
+		searchProvider: searchSetting(source.searchProvider),
+		searchUrl: textSetting(source.searchUrl, ''),
+		searchApiKey: textSetting(source.searchApiKey, ''),
+		journalFolder: textSetting(source.journalFolder, DEFAULT_SETTINGS.journalFolder),
+		journalDays: daySetting(source.journalDays),
+	};
+}
+
+function searchSetting(value: unknown): BumpySettings['searchProvider'] {
+	return value === 'searxng' || value === 'brave' || value === 'off' ? value : 'off';
+}
+
+function daySetting(value: unknown): number {
+	const number = typeof value === 'number' ? value : Number(value);
+	if (!Number.isInteger(number) || number < 1 || number > 365) return 7;
+	return number;
+}
+
+function conflictSetting(
+	value: unknown,
+): BumpySettings['calendarConflict'] {
+	return value === 'vault-wins' || value === 'calendar-wins' || value === 'ask'
+		? value
+		: 'ask';
+}
+
+function hourSetting(value: unknown): number {
+	const number = typeof value === 'number' ? value : Number(value);
+	if (!Number.isInteger(number) || number < 0 || number > 23) return 9;
+	return number;
+}
+
+function speechRoute(value: unknown, fallback: SpeechRoute): SpeechRoute {
+	return value === 'web-speech' || value === 'openai-audio' ? value : fallback;
+}
+
+function textSetting(value: unknown, fallback: string): string {
+	return typeof value === 'string' ? value : fallback;
+}
 
 export interface SettingsOwner {
 	settings: BumpySettings;
 	saveSettings(): Promise<void>;
+	requests: RequestScope;
 }
-
-export class BumpySettingTab extends PluginSettingTab {
-	private readonly owner: SettingsOwner;
-
-	constructor(app: App, plugin: Plugin & SettingsOwner) {
-		super(app, plugin);
-		this.owner = plugin;
-	}
-
-	// Obsidian 1.13+ uses this for settings search and skips display().
-	// The API key stays a custom row so the field can be a password input.
-	getSettingDefinitions(): SettingDefinition[] {
-		return [
-			{
-				name: 'Provider URL',
-				desc: PROVIDER_URL_DESC,
-				control: {
-					type: 'text',
-					key: 'baseUrl',
-					placeholder: 'Base URL',
-				},
-			},
-			{
-				name: 'Model',
-				desc: 'Name expected by the provider.',
-				control: {
-					type: 'text',
-					key: 'model',
-					placeholder: 'Model name',
-				},
-			},
-			{
-				name: 'API key',
-				desc: API_KEY_DESC,
-				render: (setting: Setting) => {
-					setting.addText((text) => {
-						text.inputEl.type = 'password';
-						text.inputEl.autocomplete = 'off';
-						text
-							.setPlaceholder('Optional')
-							.setValue(this.owner.settings.apiKey)
-							.onChange(async (value) => {
-								this.owner.settings.apiKey = value;
-								await this.owner.saveSettings();
-							});
-					});
-				},
-			},
-		];
-	}
-
-	// Obsidian before 1.13 renders this instead.
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Provider URL')
-			.setDesc(PROVIDER_URL_DESC)
-			.addText((text) =>
-				text
-					.setPlaceholder('Base URL')
-					.setValue(this.owner.settings.baseUrl)
-					.onChange(async (value) => {
-						this.owner.settings.baseUrl = value;
-						await this.owner.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName('Model')
-			.setDesc('Name expected by the provider.')
-			.addText((text) =>
-				text
-					.setPlaceholder('Model name')
-					.setValue(this.owner.settings.model)
-					.onChange(async (value) => {
-						this.owner.settings.model = value;
-						await this.owner.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName('API key')
-			.setDesc(API_KEY_DESC)
-			.addText((text) => {
-				text.inputEl.type = 'password';
-				text.inputEl.autocomplete = 'off';
-				text
-					.setPlaceholder('Optional')
-					.setValue(this.owner.settings.apiKey)
-					.onChange(async (value) => {
-						this.owner.settings.apiKey = value;
-						await this.owner.saveSettings();
-					});
-			});
-	}
-}
-
-const PROVIDER_URL_DESC =
-	'OpenAI-compatible base URL. Leave the API key empty for a local server that does not require one.';
-
-const API_KEY_DESC =
-	"Stored in this vault's plugin data on this device. It is not written into notes.";
-
-interface TextControlDefinition {
-	name: string;
-	desc: string;
-	control: {
-		type: 'text';
-		key: keyof BumpySettings;
-		placeholder: string;
-	};
-}
-
-interface RenderedSettingDefinition {
-	name: string;
-	desc: string;
-	render: (setting: Setting) => void;
-}
-
-type SettingDefinition = TextControlDefinition | RenderedSettingDefinition;

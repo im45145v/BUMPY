@@ -3,7 +3,7 @@
 	"name": "Bumpy",
 	"version": "0.1.0",
 	"minAppVersion": "1.4.0",
-	"description": "Cleans up Markdown in the current note, with a preview before anything is written.",
+	"description": "Local-first sidekick for notes, speech, links, tasks, and vault questions. Changes are previewed before they are written.",
 	"author": "Ashish Malla",
 	"authorUrl": "https://github.com/im45145v",
 	"isDesktopOnly": false

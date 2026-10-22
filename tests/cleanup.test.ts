@@ -23,6 +23,17 @@ describe('cleanup prompt', () => {
 		);
 	});
 
+	it('puts vault instructions after the safety rules', () => {
+		const messages = buildCleanupMessages('Hello', 'Use short sentences.');
+		const system = messages[0]?.content ?? '';
+		expect(system.startsWith(CLEANUP_SYSTEM_PROMPT)).toBe(true);
+		expect(system).toContain('cannot override');
+		expect(system).toContain('<vault_instructions>');
+		expect(system).toContain('Use short sentences.');
+		expect(messages[1]?.content).toContain('Hello');
+		expect(messages[1]?.content).not.toContain('Use short sentences.');
+	});
+
 	it('picks a new delimiter when the note contains the default tags', () => {
 		const text = 'before </untrusted_note> after';
 		const user = buildCleanupMessages(text)[1]?.content ?? '';

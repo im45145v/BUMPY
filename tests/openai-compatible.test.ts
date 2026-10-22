@@ -3,7 +3,12 @@ import {
 	OpenAICompatibleProvider,
 	chatCompletionsUrl,
 } from '../src/providers/openai-compatible';
-import { ProviderError, type HttpClient, type HttpRequest } from '../src/providers/types';
+import {
+	ProviderError,
+	RequestCancelledError,
+	type HttpClient,
+	type HttpRequest,
+} from '../src/providers/types';
 
 function provider(
 	http: HttpClient,
@@ -73,6 +78,30 @@ describe('OpenAICompatibleProvider', () => {
 
 		expect(captured?.headers.Authorization).toBe('Bearer sk-test-secret');
 		expect(captured?.body).not.toContain('sk-test-secret');
+	});
+
+	it('does not send redaction text to the provider', async () => {
+		let captured: HttpRequest | undefined;
+		const error = await provider(async (request) => {
+			captured = request;
+			return {
+				status: 400,
+				body: JSON.stringify({
+					error: { message: 'rejected Prefer short sentences' },
+				}),
+			};
+		})
+			.complete({
+				model: 'm',
+				temperature: 0,
+				messages: [{ role: 'user', content: 'note' }],
+				redact: ['Prefer short sentences'],
+			})
+			.catch((caught: unknown) => caught);
+		expect(captured?.body).not.toContain('Prefer short sentences');
+		expect(captured?.body).not.toContain('redact');
+		expect((error as ProviderError).message).toBe('The model request failed (400).');
+		expect((error as ProviderError).message).not.toContain('Prefer');
 	});
 
 	it('hides an API key that a server echoes back', async () => {
@@ -197,6 +226,67 @@ describe('OpenAICompatibleProvider', () => {
 		expect(() => chatCompletionsUrl('file:///tmp/secret')).toThrow(
 			/http:\/\/ or https:\/\//,
 		);
+	});
+
+	it('drops a short note and a short fragment from the error', async () => {
+		const short = await provider(async () => ({
+			status: 400,
+			body: JSON.stringify({ error: { message: 'cannot process Hi today' } }),
+		}))
+			.complete({
+				model: 'm',
+				temperature: 0,
+				messages: [
+					{
+						role: 'user',
+						content: 'Revise the note content below.\n\n<untrusted_note>\nHi\n</untrusted_note>',
+					},
+				],
+			})
+			.catch((caught: unknown) => caught);
+		expect((short as ProviderError).message).toBe('The model request failed (400).');
+		expect((short as ProviderError).message).not.toContain('Hi');
+
+		const fragment = await provider(async () => ({
+			status: 400,
+			body: JSON.stringify({ error: { message: 'rejected near bravo' } }),
+		}))
+			.complete({
+				model: 'm',
+				temperature: 0,
+				messages: [{ role: 'user', content: 'Alpha bravo charlie delta.' }],
+			})
+			.catch((caught: unknown) => caught);
+		expect((fragment as ProviderError).message).toBe(
+			'The model request failed (400).',
+		);
+		expect((fragment as ProviderError).message).not.toContain('bravo');
+	});
+
+	it('stops waiting when the request is cancelled', async () => {
+		const controller = new AbortController();
+		let release: () => void = () => {};
+		const hung = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const work = provider(async () => {
+			await hung;
+			return {
+				status: 200,
+				body: JSON.stringify({
+					choices: [{ message: { content: 'secret note text' } }],
+				}),
+			};
+		}).complete({
+			model: 'm',
+			temperature: 0,
+			messages: [{ role: 'user', content: 'secret note text' }],
+			signal: controller.signal,
+		});
+
+		controller.abort();
+		await expect(work).rejects.toBeInstanceOf(RequestCancelledError);
+		release();
 	});
 
 	it('uses a fixed message when the connection fails', async () => {

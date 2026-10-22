@@ -1,3 +1,4 @@
+import { composeInstructions } from '../instructions/policy';
 import type { ChatMessage } from '../providers/types';
 
 export const MAX_CLEANUP_CHARS = 100_000;
@@ -37,10 +38,16 @@ export function modelSettingError(model: string): string | null {
 	return null;
 }
 
-export function buildCleanupMessages(text: string): ChatMessage[] {
+export function buildCleanupMessages(
+	text: string,
+	instructions = '',
+): ChatMessage[] {
 	const token = delimiterFor(text);
 	return [
-		{ role: 'system', content: CLEANUP_SYSTEM_PROMPT },
+		{
+			role: 'system',
+			content: composeInstructions(CLEANUP_SYSTEM_PROMPT, instructions),
+		},
 		{
 			role: 'user',
 			content: `Revise the note content below.\n\n<${token}>\n${text}\n</${token}>`,

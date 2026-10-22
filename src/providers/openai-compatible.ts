@@ -1,5 +1,8 @@
+import { untilAbort } from './abort';
+import { revealsSensitiveText, secretsFrom } from './redact';
 import {
 	ProviderError,
+	RequestCancelledError,
 	type AIProvider,
 	type CompletionRequest,
 	type HttpClient,
@@ -25,18 +28,26 @@ export class OpenAICompatibleProvider implements AIProvider {
 
 		let response: HttpResponse;
 		try {
-			response = await this.http({
-				url,
-				headers,
-				body: JSON.stringify({
-					model: request.model,
-					temperature: request.temperature,
-					messages: request.messages,
+			response = await untilAbort(
+				this.http({
+					url,
+					headers,
+					body: JSON.stringify({
+						model: request.model,
+						temperature: request.temperature,
+						messages: request.messages,
+					}),
+					signal: request.signal,
 				}),
-			});
-		} catch {
+				request.signal,
+			);
+		} catch (error) {
+			if (request.signal?.aborted || error instanceof RequestCancelledError) {
+				throw new RequestCancelledError();
+			}
 			throw new ProviderError('Could not reach the model provider.');
 		}
+		if (request.signal?.aborted) throw new RequestCancelledError();
 
 		if (response.status < 200 || response.status >= 300) {
 			throw new ProviderError(
@@ -91,33 +102,15 @@ function safeDetail(
 		detail = '';
 	}
 	detail = detail.replace(/\s+/g, ' ').trim().slice(0, OUTER_ERROR_LIMIT);
-	if (detailLeaks(detail, apiKey, request)) return '';
-	return detail;
-}
-
-function detailLeaks(
-	detail: string,
-	apiKey: string,
-	request: CompletionRequest,
-): boolean {
-	if (apiKey && detail.includes(apiKey)) return true;
-	for (const message of request.messages) {
-		if (message.role !== 'user' || message.content.length < 12) continue;
-		if (detail.includes(message.content)) return true;
-		const note = enclosedNote(message.content);
-		if (note && note.length >= 12 && detail.includes(note)) return true;
+	if (
+		revealsSensitiveText(
+			detail,
+			secretsFrom(apiKey, request.messages, request.redact ?? []),
+		)
+	) {
+		return '';
 	}
-	return false;
-}
-
-function enclosedNote(content: string): string | null {
-	const open = /<(untrusted_note(?:_\d+)?)>\n/.exec(content);
-	const token = open?.[1];
-	if (!open || token === undefined || open.index === undefined) return null;
-	const start = open.index + open[0].length;
-	const end = content.lastIndexOf(`\n</${token}>`);
-	if (end < start) return null;
-	return content.slice(start, end);
+	return detail;
 }
 
 function errorMessageFrom(parsed: unknown): string {

@@ -313,6 +313,81 @@ describe('executeCleanup', () => {
 		expect(editor.replacements).toBe(0);
 	});
 
+	it('sends vault instructions as rules and marks them for redaction', async () => {
+		const editor = new FakeEditor('Messy paragraph.');
+		const provider = responding('Clean paragraph.');
+		const session = await executeCleanup(
+			editor,
+			'note',
+			'llama3.2',
+			provider.complete,
+			{ instructions: 'Prefer short sentences.' },
+		);
+		expect(session.status).toBe('preview');
+		const request = provider.requests[0];
+		expect(request?.messages[0]?.content).toContain('Prefer short sentences.');
+		expect(request?.messages[0]?.content.startsWith('You revise Markdown')).toBe(
+			true,
+		);
+		expect(request?.messages[1]?.content).toContain('Messy paragraph.');
+		expect(request?.messages[1]?.content).not.toContain('Prefer short sentences.');
+		expect(request?.redact).toEqual([
+			'Prefer short sentences.',
+			'Messy paragraph.',
+		]);
+		expect(JSON.stringify(request?.messages)).not.toContain('"redact"');
+	});
+
+	it('does not preview a cleanup that was cancelled in flight', async () => {
+		const editor = new FakeEditor(NOTE);
+		const already = new AbortController();
+		already.abort();
+		let calls = 0;
+		const skipped = await executeCleanup(
+			editor,
+			'note',
+			'llama3.2',
+			async () => {
+				calls += 1;
+				return CLEANED;
+			},
+			{ signal: already.signal },
+		);
+		expect(skipped).toEqual({ status: 'cancelled' });
+		expect(calls).toBe(0);
+
+		const controller = new AbortController();
+		const cancelled = await executeCleanup(
+			editor,
+			'note',
+			'llama3.2',
+			async () => {
+				controller.abort();
+				return CLEANED;
+			},
+			{ signal: controller.signal },
+		);
+		expect(cancelled).toEqual({ status: 'cancelled' });
+		expect(editor.getValue()).toBe(NOTE);
+		expect(editor.replacements).toBe(0);
+	});
+
+	it('warns about a destructive proposal and still requires apply', async () => {
+		const editor = new FakeEditor(NOTE);
+		const session = await executeCleanup(
+			editor,
+			'note',
+			'llama3.2',
+			async () => 'A short replacement with none of the structure.',
+		);
+		expect(session.status).toBe('preview');
+		if (session.status !== 'preview') return;
+		expect(session.warnings.length).toBeGreaterThan(0);
+		expect(editor.replacements).toBe(0);
+		expect(session.apply().ok).toBe(true);
+		expect(editor.getValue()).toBe('A short replacement with none of the structure.');
+	});
+
 	it('does not apply an empty unwrapped proposal', async () => {
 		const editor = new FakeEditor('Messy paragraph.');
 		const session = await executeCleanup(

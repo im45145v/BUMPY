@@ -1,29 +1,36 @@
 import { Plugin } from 'obsidian';
 import { registerCommands } from './commands';
-import {
-	BumpySettingTab,
-	DEFAULT_SETTINGS,
-	type BumpySettings,
-} from './settings';
+import { registerKnowledge } from './commands/knowledge';
+import { registerTaskFeatures } from './commands/tasks';
+import { RequestScope } from './requests/scope';
+import { normalizeSettings, type BumpySettings } from './settings';
+import { BumpySettingTab } from './ui/settings-tab';
 
 export default class BumpyPlugin extends Plugin {
 	settings!: BumpySettings;
+	readonly requests = new RequestScope();
+	readonly firedReminders = new Set<string>();
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		this.addSettingTab(new BumpySettingTab(this.app, this));
 		registerCommands(this);
+		registerTaskFeatures(this);
+		registerKnowledge(this);
+	}
+
+	onunload(): void {
+		this.requests.cancelAll();
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
+		this.settings = normalizeSettings(
 			(await this.loadData()) as Partial<BumpySettings>,
 		);
 	}
 
 	async saveSettings(): Promise<void> {
-		await this.saveData(this.settings);
+		const stored = ((await this.loadData()) ?? {}) as Record<string, unknown>;
+		await this.saveData({ ...stored, ...this.settings });
 	}
 }

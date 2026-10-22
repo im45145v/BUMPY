@@ -3,6 +3,7 @@ import { App, ButtonComponent, Modal } from 'obsidian';
 export interface CleanupPreview {
 	original: string;
 	proposed: string;
+	warnings?: readonly string[];
 	onApply: () => boolean;
 }
 
@@ -31,6 +32,14 @@ export class CleanupPreviewModal extends Modal {
 			});
 		}
 
+		const warnings = this.preview.warnings ?? [];
+		if (warnings.length > 0) {
+			const box = contentEl.createDiv({ cls: 'bumpy-preview-warnings' });
+			box.createEl('p', { text: 'Review these warnings before applying.' });
+			const list = box.createEl('ul');
+			for (const warning of warnings) list.createEl('li', { text: warning });
+		}
+
 		const columns = contentEl.createDiv({ cls: 'bumpy-preview-columns' });
 		addPane(columns, 'Original', this.preview.original);
 		addPane(columns, 'Proposed', this.preview.proposed);
@@ -41,7 +50,7 @@ export class CleanupPreviewModal extends Modal {
 		});
 
 		const apply = new ButtonComponent(actions)
-			.setButtonText('Apply')
+			.setButtonText(warnings.length > 0 ? 'Apply anyway' : 'Apply')
 			.setCta()
 			.onClick(() => {
 				if (this.preview.onApply()) this.close();

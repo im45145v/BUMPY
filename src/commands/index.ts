@@ -1,6 +1,8 @@
 import type { Plugin } from 'obsidian';
 import { canCleanNote, canCleanSelection } from '../notes/editor-apply';
 import { runCleanup, type CleanupHost } from './cleanup';
+import { registerLinkCommands } from './links';
+import { registerSpeechCommands } from './speech';
 import { CLEANUP_COMMANDS } from './specs';
 
 export function registerCommands(
@@ -21,4 +23,6 @@ export function registerCommands(
 			},
 		});
 	}
+	registerSpeechCommands(plugin);
+	registerLinkCommands(plugin);
 }

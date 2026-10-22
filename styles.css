@@ -21,9 +21,74 @@
 	padding: var(--size-4-2);
 }
 
+.bumpy-preview-warnings {
+	margin-top: 12px;
+	padding: var(--size-4-2) var(--size-4-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-secondary);
+}
+
+.bumpy-preview-warnings p {
+	margin-top: 0;
+}
+
 .bumpy-preview-actions {
 	display: flex;
 	justify-content: flex-end;
 	gap: 8px;
 	margin-top: 12px;
+}
+
+.bumpy-notice-cancel {
+	margin-left: 8px;
+}
+
+.bumpy-transcript {
+	width: 100%;
+	min-height: 160px;
+	margin-top: 12px;
+}
+
+.bumpy-dictate-partial {
+	color: var(--text-muted);
+	white-space: pre-wrap;
+}
+
+.bumpy-calendar-title {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.bumpy-calendar {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 4px;
+}
+
+.bumpy-calendar-label,
+.bumpy-calendar-date {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.bumpy-calendar-day {
+	min-height: 72px;
+	padding: 4px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+}
+
+.bumpy-calendar-outside {
+	opacity: 0.55;
+}
+
+.bumpy-calendar-task {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
