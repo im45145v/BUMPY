@@ -6,6 +6,7 @@ import type { CleanupEditor } from '../notes/editor-apply';
 import { cancelled } from '../providers/abort';
 import { createProvider } from '../providers/create-provider';
 import { obsidianHttp } from '../providers/obsidian-http';
+import { usesBackboard } from '../providers/presets';
 import { ProviderError } from '../providers/types';
 import { answerWithSources, buildAskMessages } from '../rag/ask';
 import { embedInBatches } from '../rag/batch';
@@ -182,6 +183,11 @@ async function embedPassages(
 ): Promise<number[][]> {
 	if (texts.length === 0) return [];
 	if (plugin.settings.embeddings === 'local') return texts.map((text) => hashEmbed(text));
+	if (usesBackboard(plugin.settings.preset, plugin.settings.baseUrl)) {
+		throw new ProviderError(
+			'Backboard does not embed vault notes. Keep embeddings on local hashing.',
+		);
+	}
 	return embedInBatches(texts, (batch) =>
 		embedWithProvider(
 			obsidianHttp,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkProvider, formatProviderCheck } from '../src/providers/models';
-import { inferPreset } from '../src/providers/presets';
+import { applyPresetSelection, inferPreset } from '../src/providers/presets';
+import { chatCompletionsUrl } from '../src/providers/openai-compatible';
 import type { HttpRequest } from '../src/providers/types';
 import { normalizeSettings } from '../src/settings';
 
@@ -14,7 +15,26 @@ describe('provider settings', () => {
 			}).preset,
 		).toBe('ollama');
 		expect(inferPreset('https://api.openai.com/v1/')).toBe('openai');
+		expect(inferPreset('https://generativelanguage.googleapis.com/v1beta/openai')).toBe(
+			'gemini',
+		);
+		expect(inferPreset('https://app.backboard.io/api')).toBe('backboard');
 		expect(inferPreset('http://127.0.0.1:9999/v1')).toBe('custom');
+		expect(
+			chatCompletionsUrl('https://generativelanguage.googleapis.com/v1beta/openai'),
+		).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+	});
+
+	it('fills the Gemini and Backboard URLs and starting models', () => {
+		const settings = normalizeSettings({});
+		applyPresetSelection(settings, 'gemini');
+		expect(settings.baseUrl).toBe(
+			'https://generativelanguage.googleapis.com/v1beta/openai',
+		);
+		expect(settings.model).toBe('gemini-3.8-flash');
+		applyPresetSelection(settings, 'backboard');
+		expect(settings.baseUrl).toBe('https://app.backboard.io/api');
+		expect(settings.model).toBe('gpt-4o');
 	});
 
 	it('keeps a saved preset and does not invent an API key', () => {

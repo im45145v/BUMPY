@@ -21,15 +21,17 @@ These commands are available from the command palette:
 
 ## Provider
 
-Bumpy talks to one OpenAI-compatible endpoint. That covers a local server such as Ollama and a hosted API.
+Bumpy talks to an OpenAI-compatible chat endpoint. That covers a local server such as Ollama, OpenAI, and Gemini. **Backboard** uses Backboard’s own message API with the same key field.
 
 In **Settings → Bumpy**:
 
-- **Provider** fills the usual URL for Ollama, LM Studio, or OpenAI. **Custom** leaves the URL as you typed it.
+- **Provider** fills the usual URL for Ollama, LM Studio, OpenAI, Gemini, or Backboard. Gemini and Backboard also fill a starting model name. **Custom** leaves the URL as you typed it.
 - **Provider URL** is the base URL, for example `http://127.0.0.1:11434/v1`.
 - **Model** is the name that server expects.
-- **API key** is optional. It is stored in this vault’s plugin data on this device and is not written into notes. Leave it empty for a local server that does not require one.
+- **API key** is optional for a local server. Gemini and Backboard require their own keys. The key is stored in this vault’s plugin data on this device and is not written into notes. Gemini is sent as a bearer token. Backboard is sent as `X-API-Key`.
 - **Check connection** asks the provider for its model list. The key is sent only in the request header.
+
+Gemini uses `https://generativelanguage.googleapis.com/v1beta/openai`. Backboard uses `https://app.backboard.io/api` and does not store the note in Backboard memory. Provider audio and provider embeddings stay on the OpenAI-compatible URL, so leave those on the local options when the provider is Backboard. Note text is still sent to Gemini or Backboard when you run cleanup, ask, or research.
 
 Cleanup, answers, and research interpretation use that chat endpoint. Note text is sent only when you run one of those commands. Provider errors are redacted so they do not echo note text or the API key. Cancelling stops Bumpy from using the response. Obsidian’s request API cannot abort the underlying socket, so a cancelled request may still finish at the server.
 

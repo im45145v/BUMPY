@@ -14,6 +14,8 @@ import { playAudioBytes } from '../audio/playback';
 import { readAloud } from '../audio/speak';
 import { selectionRange, type CleanupEditor } from '../notes/editor-apply';
 import { obsidianHttp } from '../providers/obsidian-http';
+import { usesBackboard } from '../providers/presets';
+import { ProviderError } from '../providers/types';
 import { cancelOnClick } from '../requests/dismiss';
 import { DictateModal } from '../ui/dictate-modal';
 import type { CleanupHost } from './cleanup';
@@ -110,6 +112,11 @@ async function speakText(
 		await speakWithWebSpeech(text, signal);
 		return;
 	}
+	if (usesBackboard(host.settings.preset, host.settings.baseUrl)) {
+		throw new ProviderError(
+			'Backboard does not provide the audio API. Use App speech service.',
+		);
+	}
 	const bytes = await synthesizeSpeech(obsidianHttp, text, host.settings.speechVoice, {
 		baseUrl: host.settings.baseUrl,
 		apiKey: host.settings.apiKey,
@@ -121,6 +128,17 @@ async function speakText(
 
 function speechInput(host: CleanupHost): SpeechInputEngine {
 	if (host.settings.speechInput === 'openai-audio') {
+		if (usesBackboard(host.settings.preset, host.settings.baseUrl)) {
+			return {
+				isSupported: () => true,
+				listen: () =>
+					Promise.reject(
+						new ProviderError(
+							'Backboard does not provide the audio API. Use App speech service.',
+						),
+					),
+			};
+		}
 		return createRecorderInput(new BrowserAudioRecorder(), (audio, mime, requestSignal) =>
 			transcribeAudio(obsidianHttp, audio, mime, {
 				baseUrl: host.settings.baseUrl,

@@ -1,10 +1,13 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { checkBackboard } from '../providers/backboard';
 import { checkProvider, formatProviderCheck } from '../providers/models';
 import { obsidianHttp } from '../providers/obsidian-http';
 import {
 	PRESET_IDS,
 	PROVIDER_PRESETS,
+	applyPresetSelection,
 	isProviderPreset,
+	usesBackboard,
 } from '../providers/presets';
 import {
 	type BumpySettings,
@@ -145,9 +148,7 @@ export class BumpySettingTab extends PluginSettingTab {
 			}
 			dropdown.setValue(this.owner.settings.preset).onChange(async (value) => {
 				if (!isProviderPreset(value)) return;
-				this.owner.settings.preset = value;
-				const url = PROVIDER_PRESETS[value].baseUrl;
-				if (url) this.owner.settings.baseUrl = url;
+				applyPresetSelection(this.owner.settings, value);
 				await this.owner.saveSettings();
 				this.display();
 			});
@@ -180,7 +181,13 @@ export class BumpySettingTab extends PluginSettingTab {
 		const controller = this.owner.requests.start();
 		const notice = new Notice('Checking the provider…', 0);
 		try {
-			const result = await checkProvider(
+			const check = usesBackboard(
+				this.owner.settings.preset,
+				this.owner.settings.baseUrl,
+			)
+				? checkBackboard
+				: checkProvider;
+			const result = await check(
 				obsidianHttp,
 				this.owner.settings.baseUrl,
 				this.owner.settings.apiKey,
@@ -196,10 +203,10 @@ export class BumpySettingTab extends PluginSettingTab {
 }
 
 const PROVIDER_DESC =
-	'Choosing a provider fills its usual URL. Choose Custom to keep the URL as you typed it.';
+	'Choosing a provider fills its usual URL and, for Gemini and Backboard, a starting model. Choose Custom to keep the URL as you typed it.';
 
 const PROVIDER_URL_DESC =
-	'OpenAI-compatible base URL. Leave the API key empty for a local server that does not require one.';
+	'Gemini uses its OpenAI-compatible URL. Backboard uses its own API. Leave the API key empty for a local server that does not require one.';
 
 const API_KEY_DESC =
 	"Stored in this vault's plugin data on this device. It is not written into notes.";
