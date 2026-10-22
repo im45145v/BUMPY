@@ -9,6 +9,31 @@ export function reminderNotice(title: string, time: string | null): string {
 	return time ? `Reminder: ${title} at ${time}` : `Reminder: ${title}`;
 }
 
+export interface DesktopReminderChannel {
+	supported: boolean;
+	permission(): 'granted' | 'denied' | 'default';
+	requestPermission(): Promise<'granted' | 'denied' | 'default'>;
+	show(title: string, body: string): void;
+}
+
+/** Sends the same reminder text to the operating system when it is allowed. */
+export async function publishDesktopReminder(
+	enabled: boolean,
+	message: string,
+	channel: DesktopReminderChannel,
+): Promise<boolean> {
+	if (!enabled || !channel.supported || message.trim() === '') return false;
+	try {
+		let permission = channel.permission();
+		if (permission === 'default') permission = await channel.requestPermission();
+		if (permission !== 'granted') return false;
+		channel.show('Bumpy', message);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export function readFiredReminders(data: unknown): string[] {
 	if (!data || typeof data !== 'object') return [];
 	const value = (data as { firedReminders?: unknown }).firedReminders;

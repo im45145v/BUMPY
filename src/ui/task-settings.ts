@@ -1,5 +1,6 @@
 import { Setting } from 'obsidian';
 import type { BumpySettings, SettingsOwner } from '../settings';
+import { obsidianDesktopReminder } from '../tasks/desktop-reminder';
 
 const CONFLICTS: Array<{ value: BumpySettings['calendarConflict']; label: string }> = [
 	{ value: 'ask', label: 'Ask me' },
@@ -27,6 +28,11 @@ export function taskRows(owner: SettingsOwner): Array<{
 			name: 'Reminder hour',
 			desc: 'Hour, from 0 to 23, used when a task has a date and no time.',
 			render: (setting) => addHour(setting, owner),
+		},
+		{
+			name: 'Computer notifications',
+			desc: 'Also sends the reminder to Notification Center while Obsidian is open. It appears as an Obsidian notification. Allow notifications for Obsidian if the system asks. Nothing is sent while Obsidian is closed.',
+			render: (setting) => addSystemReminders(setting, owner),
 		},
 		{
 			name: 'Calendar conflict',
@@ -57,6 +63,20 @@ function addHour(setting: Setting, owner: SettingsOwner): void {
 				owner.settings.reminderHour = hour;
 				await owner.saveSettings();
 			});
+	});
+}
+
+function addSystemReminders(setting: Setting, owner: SettingsOwner): void {
+	setting.addToggle((toggle) => {
+		toggle.setValue(owner.settings.systemReminders).onChange(async (value) => {
+			owner.settings.systemReminders = value;
+			await owner.saveSettings();
+			if (!value) return;
+			const channel = obsidianDesktopReminder();
+			if (channel.supported && channel.permission() === 'default') {
+				await channel.requestPermission();
+			}
+		});
 	});
 }
 

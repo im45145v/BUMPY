@@ -79,7 +79,9 @@ Suggested links skip existing links, code, and generic titles such as `readme`. 
 
 Tasks are ordinary Markdown lines, for example `- [ ] Pay rent 📅 2026-10-23`. Phrases such as “next week” or “soon” ask you to pick a date.
 
-Reminders are in-app notices. They are checked when Obsidian loads and about once a minute after that. A task with a time is reminded at that time. A task with only a date uses the reminder hour. Each reminder fires once, including after a reload, while the task is still due within the last 36 hours. The fired list is stored in plugin data on this device and is not written into notes. Bumpy does not use the operating system’s notification API.
+Reminders are in-app notices. They are checked when Obsidian loads and about once a minute after that. A task with a time is reminded at that time. A task with only a date uses the reminder hour. Each reminder fires once, including after a reload, while the task is still due within the last 36 hours. The fired list is stored in plugin data on this device and is not written into notes.
+
+**Computer notifications** is on by default. On the desktop app, the same reminder is also sent to Notification Center while Obsidian is open. It is shown by Obsidian, so the system permission belongs to Obsidian. Allow notifications for Obsidian if asked. The task title is the notification text. Nothing is sent while Obsidian is closed, and the mobile app keeps the in-app notice only.
 
 **Show calendar** lists open tasks that are due today or earlier, then a month grid. Today is outlined. A task with a time shows that time. Select a task to open its note.
 

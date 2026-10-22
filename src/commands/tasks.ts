@@ -7,7 +7,8 @@ import { selectionRange } from '../notes/editor-apply';
 import { obsidianHttp } from '../providers/obsidian-http';
 import { createGoogleEvent, listGoogleEvents, updateGoogleEvent } from '../tasks/google';
 import { dueReminderKeys, reminderInstant } from '../tasks/calendar';
-import { reminderKey, reminderNotice } from '../tasks/reminders';
+import { obsidianDesktopReminder } from '../tasks/desktop-reminder';
+import { publishDesktopReminder, reminderKey, reminderNotice } from '../tasks/reminders';
 import {
 	formatTaskLine,
 	parseTaskLine,
@@ -103,7 +104,13 @@ async function remind(plugin: TaskHost): Promise<void> {
 		plugin.firedReminders.add(key);
 		changed = true;
 		const item = items.find((candidate) => candidate.key === key);
-		new Notice(reminderNotice(item?.title ?? 'Task', item?.time ?? null));
+		const message = reminderNotice(item?.title ?? 'Task', item?.time ?? null);
+		new Notice(message);
+		void publishDesktopReminder(
+			plugin.settings.systemReminders,
+			message,
+			obsidianDesktopReminder(),
+		);
 	}
 	if (changed) await saveFired(plugin);
 }

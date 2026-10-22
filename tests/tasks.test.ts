@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { buildMonth, dueReminderKeys, dueTasks, reminderInstant } from '../src/tasks/calendar';
 import { createGoogleEvent, googleEventBody, listGoogleEvents } from '../src/tasks/google';
-import { readFiredReminders, reminderKey } from '../src/tasks/reminders';
+import {
+	publishDesktopReminder,
+	readFiredReminders,
+	reminderKey,
+	type DesktopReminderChannel,
+} from '../src/tasks/reminders';
 import {
 	appendTask,
 	formatTaskLine,
@@ -118,6 +123,25 @@ describe('calendar and reminders', () => {
 		expect(readFiredReminders({ firedReminders: ['Tasks.md:2026-10-23::Pay rent', 4] })).toEqual([
 			'Tasks.md:2026-10-23::Pay rent',
 		]);
+	});
+
+	it('sends a computer notification only after permission is granted', async () => {
+		const sent: string[] = [];
+		const channel = fakeChannel('granted', sent);
+		expect(await publishDesktopReminder(true, 'Reminder: Stretch at 15:00', channel)).toBe(
+			true,
+		);
+		expect(sent).toEqual(['Bumpy\nReminder: Stretch at 15:00']);
+		sent.length = 0;
+		expect(await publishDesktopReminder(false, 'Reminder: Stretch', channel)).toBe(false);
+		expect(sent).toEqual([]);
+		expect(
+			await publishDesktopReminder(true, 'Reminder: Stretch', fakeChannel('denied', sent)),
+		).toBe(false);
+		const asking = fakeChannel('default', sent, 'granted');
+		expect(await publishDesktopReminder(true, 'Reminder: Pay rent', asking)).toBe(true);
+		expect(asking.asked).toBe(1);
+		expect(sent).toEqual(['Bumpy\nReminder: Pay rent']);
 	});
 });
 
@@ -310,3 +334,25 @@ describe('calendar sync', () => {
 		).toBe('update-event');
 	});
 });
+
+function fakeChannel(
+	permission: 'granted' | 'denied' | 'default',
+	sent: string[],
+	afterAsk: 'granted' | 'denied' | 'default' = permission,
+): DesktopReminderChannel & { asked: number } {
+	let current = permission;
+	const channel = {
+		supported: true,
+		asked: 0,
+		permission: () => current,
+		requestPermission: () => {
+			channel.asked += 1;
+			current = afterAsk;
+			return Promise.resolve(afterAsk);
+		},
+		show: (title: string, body: string) => {
+			sent.push(`${title}\n${body}`);
+		},
+	};
+	return channel;
+}

@@ -37,6 +37,7 @@ export interface BumpySettings {
 	googleAccessToken: string;
 	googleCalendarId: string;
 	reminderHour: number;
+	systemReminders: boolean;
 	embeddings: 'local' | 'provider';
 	embeddingModel: string;
 	searchProvider: 'off' | 'searxng' | 'brave';
@@ -64,6 +65,7 @@ export const DEFAULT_SETTINGS: BumpySettings = {
 	googleAccessToken: '',
 	googleCalendarId: '',
 	reminderHour: 9,
+	systemReminders: true,
 	embeddings: 'local',
 	embeddingModel: 'nomic-embed-text',
 	searchProvider: 'off',
@@ -115,6 +117,7 @@ export function normalizeSettings(
 		googleAccessToken: textSetting(source.googleAccessToken, ''),
 		googleCalendarId: textSetting(source.googleCalendarId, ''),
 		reminderHour: hourSetting(source.reminderHour),
+		systemReminders: source.systemReminders !== false,
 		embeddings: source.embeddings === 'provider' ? 'provider' : 'local',
 		embeddingModel: textSetting(source.embeddingModel, DEFAULT_SETTINGS.embeddingModel),
 		searchProvider: searchSetting(source.searchProvider),
