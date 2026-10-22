@@ -111,7 +111,7 @@ async function syncCalendar(plugin: TaskHost): Promise<void> {
 					date: task.due,
 					eventId: task.eventId,
 				};
-				return [{ notePath: note.path, raw: task.raw, tracked }];
+				return [{ notePath: note.path, line: task.line, raw: task.raw, tracked }];
 			}),
 		);
 		const start = new Date();
@@ -149,12 +149,14 @@ async function syncCalendar(plugin: TaskHost): Promise<void> {
 
 class SyncModal extends Modal {
 	private readonly choices = new Map<string, 'note' | 'calendar'>();
+	private applying = false;
 
 	constructor(
 		private readonly plugin: TaskHost,
 		private readonly actions: SyncAction[],
 		private readonly located: Array<{
 			notePath: string;
+			line: number;
 			raw: string;
 			tracked: TrackedTask;
 		}>,
@@ -177,7 +179,16 @@ class SyncModal extends Modal {
 			contentEl.createEl('p', { text: 'Calendar is already in sync.' });
 		}
 		for (const action of this.actions) {
-			if (action.type === 'unchanged' || action.type === 'remember') continue;
+			if (
+				action.type === 'unchanged' ||
+				action.type === 'remember' ||
+				action.type === 'absent-event'
+			) {
+				if (action.type === 'absent-event') {
+					contentEl.createEl('p', { text: describe(action) });
+				}
+				continue;
+			}
 			if (action.type !== 'conflict') {
 				contentEl.createEl('p', { text: describe(action) });
 				continue;
@@ -200,10 +211,13 @@ class SyncModal extends Modal {
 		}
 		const actions = contentEl.createDiv({ cls: 'bumpy-preview-actions' });
 		new ButtonComponent(actions).setButtonText('Discard').onClick(() => this.close());
-		new ButtonComponent(actions)
+		const apply = new ButtonComponent(actions)
 			.setButtonText('Apply')
 			.setCta()
 			.onClick(() => {
+				if (this.applying) return;
+				this.applying = true;
+				apply.setDisabled(true);
 				void this.apply();
 			});
 	}
@@ -214,80 +228,89 @@ class SyncModal extends Modal {
 
 	private async apply(): Promise<void> {
 		const nextLinks = [...this.links];
-		for (const action of this.resolved()) {
-			if (action.type === 'unchanged') continue;
-			if (action.type === 'conflict') {
-				new Notice('A calendar conflict was skipped because it has no choice.');
-				continue;
-			}
-			if (action.type === 'remember') {
-				upsertLink(nextLinks, action);
-				continue;
-			}
-			if (action.type === 'create-event') {
-				const created = await createGoogleEvent(
-					obsidianHttp,
-					this.calendarId,
-					this.token,
-					{ title: action.title, date: action.date },
-				);
-				const source = this.located.find((item) => item.tracked.key === action.taskKey);
-				if (source) {
-					const task = parseTaskLine(source.raw);
-					if (task) {
-						await replaceLine(
-							this.plugin,
-							source.notePath,
-							source.raw,
-							formatTaskLine({ ...task, eventId: created.id }),
+		try {
+			for (const action of this.resolved()) {
+				if (
+					action.type === 'unchanged' ||
+					action.type === 'absent-event'
+				) {
+					continue;
+				}
+				if (action.type === 'conflict') {
+					new Notice('A calendar conflict was skipped because it has no choice.');
+					continue;
+				}
+				if (action.type === 'remember') {
+					upsertLink(nextLinks, action);
+					continue;
+				}
+				if (action.type === 'create-event') {
+					const created = await createGoogleEvent(
+						obsidianHttp,
+						this.calendarId,
+						this.token,
+						{ title: action.title, date: action.date },
+					);
+					upsertLink(nextLinks, {
+						taskKey: action.taskKey,
+						eventId: created.id,
+						title: action.title,
+						date: action.date,
+					});
+					const wrote = await writeTaskEvent(
+						this.plugin,
+						this.located,
+						action.taskKey,
+						{ eventId: created.id },
+					);
+					if (!wrote) {
+						new Notice(
+							'The calendar event was created, but the task line had changed so the note was not updated.',
 						);
 					}
+					continue;
 				}
-				upsertLink(nextLinks, {
-					taskKey: action.taskKey,
-					eventId: created.id,
+				if (action.type === 'update-event') {
+					await updateGoogleEvent(obsidianHttp, this.calendarId, this.token, {
+						id: action.eventId,
+						title: action.title,
+						date: action.date,
+					});
+					upsertLink(nextLinks, {
+						taskKey: action.taskKey,
+						eventId: action.eventId,
+						title: action.title,
+						date: action.date,
+					});
+					continue;
+				}
+				const wrote = await writeTaskEvent(this.plugin, this.located, action.taskKey, {
 					title: action.title,
-					date: action.date,
+					due: action.date,
+					eventId: action.eventId,
 				});
-				continue;
-			}
-			if (action.type === 'update-event') {
-				await updateGoogleEvent(obsidianHttp, this.calendarId, this.token, {
-					id: action.eventId,
-					title: action.title,
-					date: action.date,
-				});
+				if (!wrote) {
+					new Notice('The task line changed, so the note was left unchanged.');
+					continue;
+				}
 				upsertLink(nextLinks, {
 					taskKey: action.taskKey,
 					eventId: action.eventId,
 					title: action.title,
 					date: action.date,
 				});
-				continue;
 			}
-			const source = this.located.find((item) => item.tracked.key === action.taskKey);
-			const task = source ? parseTaskLine(source.raw) : null;
-			if (source && task) {
-				await replaceLine(
-					this.plugin,
-					source.notePath,
-					source.raw,
-					formatTaskLine({
-						...task,
-						title: action.title,
-						due: action.date,
-						eventId: action.eventId,
-					}),
-				);
-			}
-			upsertLink(nextLinks, {
-				taskKey: action.taskKey,
-				eventId: action.eventId,
-				title: action.title,
-				date: action.date,
-			});
+		} catch (error) {
+			const message =
+				error instanceof ProviderError ? error.message : 'Calendar sync failed.';
+			new Notice(message);
 		}
-		await saveLinks(this.plugin, nextLinks);
+		try {
+			await saveLinks(this.plugin, nextLinks);
+		} catch {
+			new Notice('Could not save the calendar links.');
+			return;
+		}
 		this.close();
 	}
 
@@ -310,6 +333,8 @@ function describe(action: SyncAction): string {
 			return `Update the note task to ${action.title} on ${action.date}.`;
 		case 'conflict':
 			return `${action.taskTitle} on ${action.taskDate} conflicts with ${action.eventTitle} on ${action.eventDate}.`;
+		case 'absent-event':
+			return `The linked event for ${action.title} on ${action.date} was not in the checked range, so no new event will be created.`;
 		default:
 			return '';
 	}
@@ -333,15 +358,50 @@ async function saveLinks(plugin: TaskHost, links: SyncLink[]): Promise<void> {
 	await plugin.saveData({ ...stored, calendarLinks: links });
 }
 
-async function replaceLine(
+async function writeTaskEvent(
+	plugin: TaskHost,
+	located: ReadonlyArray<{
+		notePath: string;
+		line: number;
+		raw: string;
+		tracked: TrackedTask;
+	}>,
+	taskKey: string,
+	change: { title?: string; due?: string; eventId: string },
+): Promise<boolean> {
+	const source = located.find((item) => item.tracked.key === taskKey);
+	const task = source ? parseTaskLine(source.raw) : null;
+	if (!source || !task) return false;
+	return replaceTaskLine(
+		plugin,
+		source.notePath,
+		source.line,
+		source.raw,
+		formatTaskLine({
+			...task,
+			title: change.title ?? task.title,
+			due: change.due ?? task.due,
+			eventId: change.eventId,
+		}),
+	);
+}
+
+async function replaceTaskLine(
 	plugin: TaskHost,
 	path: string,
+	line: number,
 	raw: string,
 	next: string,
-): Promise<void> {
+): Promise<boolean> {
 	const file = plugin.app.vault.getAbstractFileByPath(path);
-	if (!(file instanceof TFile)) return;
-	await plugin.app.vault.process(file, (data) =>
-		data.includes(raw) ? data.replace(raw, next) : data,
-	);
+	if (!(file instanceof TFile)) return false;
+	let wrote = false;
+	await plugin.app.vault.process(file, (data) => {
+		const lines = data.split('\n');
+		if (lines[line] !== raw) return data;
+		lines[line] = next;
+		wrote = true;
+		return lines.join('\n');
+	});
+	return wrote;
 }

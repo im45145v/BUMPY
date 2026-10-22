@@ -1,3 +1,5 @@
+import { isExcluded } from '../linking/suggest';
+
 export interface Chunk {
 	path: string;
 	title: string;
@@ -127,6 +129,17 @@ export function cosine(left: readonly number[], right: readonly number[]): numbe
 	}
 	if (leftNorm === 0 || rightNorm === 0) return 0;
 	return dot / Math.sqrt(leftNorm * rightNorm);
+}
+
+/** Drop passages the user excluded or that no longer exist, even if an older index still holds them. */
+export function retrievableChunks(
+	chunks: readonly StoredChunk[],
+	excluded: readonly string[],
+	exists: (path: string) => boolean,
+): StoredChunk[] {
+	return chunks.filter(
+		(chunk) => !isExcluded(chunk.path, excluded) && exists(chunk.path),
+	);
 }
 
 export function searchChunks(

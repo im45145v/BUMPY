@@ -1,11 +1,12 @@
 import { untilAbort } from '../providers/abort';
+import { parseHttpBase } from '../providers/endpoint';
 import { revealsSensitiveText } from '../providers/redact';
 import {
 	ProviderError,
 	RequestCancelledError,
 	type HttpClient,
 } from '../providers/types';
-import type { SearchHit } from './note';
+import { isCitationUrl, type SearchHit } from './note';
 
 export async function searchWeb(
 	http: HttpClient,
@@ -21,15 +22,10 @@ export async function searchWeb(
 }
 
 function searchUrl(baseUrl: string, query: string): string {
-	let url: URL;
-	try {
-		url = new URL(`${baseUrl.trim().replace(/\/+$/, '')}/search`);
-	} catch {
-		throw new ProviderError('The search URL is not valid.');
-	}
-	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-		throw new ProviderError('The search URL must start with http:// or https://.');
-	}
+	const url = parseHttpBase(baseUrl, 'search URL');
+	let path = url.pathname.replace(/\/+$/, '');
+	if (!path.endsWith('/search')) path = `${path}/search`;
+	url.pathname = path;
 	url.searchParams.set('q', query);
 	url.searchParams.set('format', 'json');
 	return url.toString();
@@ -85,7 +81,7 @@ function hitFrom(value: unknown, snippetKey: 'content' | 'description'): SearchH
 	const url = typeof record.url === 'string' ? record.url.trim() : '';
 	const snippetValue = record[snippetKey];
 	const snippet = typeof snippetValue === 'string' ? snippetValue.trim() : '';
-	if (!title || !/^https?:\/\//.test(url)) return [];
+	if (!title || !isCitationUrl(url)) return [];
 	return [{ title, url, snippet }];
 }
 

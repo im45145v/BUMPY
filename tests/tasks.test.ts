@@ -126,6 +126,12 @@ describe('calendar sync', () => {
 		expect(
 			planSync([{ ...task, eventId: 'evt-1' }], [event], [], 'ask')[0]?.type,
 		).toBe('remember');
+		expect(
+			planSync([task], [], [link], 'ask')[0]?.type,
+		).toBe('absent-event');
+		expect(
+			planSync([{ ...task, eventId: null }], [], [link], 'ask')[0]?.type,
+		).toBe('absent-event');
 	});
 
 	it('calls Google Calendar without putting the token in the URL or the error', async () => {
@@ -169,5 +175,49 @@ describe('calendar sync', () => {
 			'Google Calendar declined the access token.',
 		);
 		expect((denied as Error).message).not.toContain('sk-calendar-secret');
+	});
+
+	it('reads every calendar page before deciding an event is missing', async () => {
+		const urls: string[] = [];
+		const events = await listGoogleEvents(
+			async (request) => {
+				urls.push(request.url);
+				if (!request.url.includes('pageToken')) {
+					return {
+						status: 200,
+						body: JSON.stringify({
+							items: [
+								{
+									id: 'evt-1',
+									summary: 'Pay rent',
+									start: { date: '2026-10-23' },
+								},
+							],
+							nextPageToken: 'page-2',
+						}),
+					};
+				}
+				return {
+					status: 200,
+					body: JSON.stringify({
+						items: [
+							{
+								id: 'evt-2',
+								summary: 'Call Sam',
+								start: { date: '2026-10-24' },
+							},
+						],
+					}),
+				};
+			},
+			'primary',
+			'token',
+			'2026-10-01T00:00:00Z',
+			'2026-11-01T00:00:00Z',
+		);
+		expect(events.map((event) => event.id)).toEqual(['evt-1', 'evt-2']);
+		expect(urls).toHaveLength(2);
+		expect(urls[1]).toContain('pageToken=page-2');
+		expect(urls[0]).not.toContain('token');
 	});
 });

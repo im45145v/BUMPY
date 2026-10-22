@@ -13,7 +13,7 @@ import { readAloud } from '../src/audio/speak';
 import { encodeMultipart } from '../src/audio/multipart';
 import { decideInsertion } from '../src/notes/insert';
 import type { HttpRequest } from '../src/providers/types';
-import { SPEECH_COMMANDS } from '../src/commands/speech-specs';
+import { SPEECH_COMMANDS, SPEECH_INPUT_DESC } from '../src/commands/speech-specs';
 import { normalizeSettings } from '../src/settings';
 
 describe('speech commands', () => {
@@ -23,6 +23,11 @@ describe('speech commands', () => {
 			'read-selection',
 			'read-note',
 		]);
+	});
+
+	it('does not describe app speech recognition as staying on this device', () => {
+		expect(SPEECH_INPUT_DESC).toMatch(/can send microphone audio/);
+		expect(SPEECH_INPUT_DESC).not.toMatch(/On this device/);
 	});
 });
 

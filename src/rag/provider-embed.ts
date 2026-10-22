@@ -1,5 +1,5 @@
 import { untilAbort } from '../providers/abort';
-import { chatCompletionsUrl } from '../providers/openai-compatible';
+import { joinApiPath } from '../providers/endpoint';
 import { revealsSensitiveText } from '../providers/redact';
 import {
 	ProviderError,
@@ -46,8 +46,7 @@ export async function embedWithProvider(
 }
 
 export function embeddingsUrl(baseUrl: string): string {
-	const chat = chatCompletionsUrl(baseUrl);
-	return `${chat.slice(0, -'/chat/completions'.length)}/embeddings`;
+	return joinApiPath(baseUrl, 'embeddings');
 }
 
 function failure(

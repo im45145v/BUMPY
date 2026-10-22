@@ -1,8 +1,13 @@
 import { Setting } from 'obsidian';
+import {
+	APP_SPEECH_LABEL,
+	SPEECH_INPUT_DESC,
+	SPEECH_OUTPUT_DESC,
+} from '../commands/speech-specs';
 import type { SettingsOwner, SpeechRoute } from '../settings';
 
 const ROUTES: Array<{ value: SpeechRoute; label: string }> = [
-	{ value: 'web-speech', label: 'On this device' },
+	{ value: 'web-speech', label: APP_SPEECH_LABEL },
 	{ value: 'openai-audio', label: 'Provider audio API' },
 ];
 
@@ -26,12 +31,12 @@ export function speechRows(owner: SettingsOwner): Array<{
 	return [
 		{
 			name: 'Speech to text',
-			desc: 'On this device uses speech recognition in the app. Provider audio API records audio and sends it to the provider URL.',
+			desc: SPEECH_INPUT_DESC,
 			render: (setting) => addRoute(setting, owner, 'speechInput'),
 		},
 		{
 			name: 'Text to speech',
-			desc: 'On this device uses speech synthesis in the app. Provider audio API sends the text to the provider and plays the audio it returns.',
+			desc: SPEECH_OUTPUT_DESC,
 			render: (setting) => addRoute(setting, owner, 'speechOutput'),
 		},
 		{

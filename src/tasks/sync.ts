@@ -34,12 +34,15 @@ export type SyncAction =
 			eventDate: string;
 	  }
 	| { type: 'remember'; taskKey: string; eventId: string; title: string; date: string }
+	| { type: 'absent-event'; taskKey: string; eventId: string; title: string; date: string }
 	| { type: 'unchanged'; taskKey: string };
 
 /**
  * Vault tasks with dates are the records Bumpy creates.
  * Calendar events that Bumpy did not link are left alone.
  * When both sides changed since the last sync, `ask` reports a conflict.
+ * A task that already has an event id is not given another event when that
+ * event is missing from the fetched list.
  */
 export function planSync(
 	tasks: readonly TrackedTask[],
@@ -59,6 +62,16 @@ export function planSync(
 		const eventId = task.eventId ?? link?.eventId ?? null;
 		const event = eventId ? eventsById.get(eventId) : undefined;
 		if (!event) {
+			if (eventId) {
+				actions.push({
+					type: 'absent-event',
+					taskKey: task.key,
+					eventId,
+					title: task.title,
+					date: task.date,
+				});
+				continue;
+			}
 			actions.push({
 				type: 'create-event',
 				taskKey: task.key,

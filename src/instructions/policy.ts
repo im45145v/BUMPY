@@ -83,6 +83,19 @@ export async function loadInstructions(
 	};
 }
 
+/** Wrap untrusted text in a delimiter that the text itself does not close. */
+export function wrapUntrusted(prefix: string, text: string): string {
+	let token = prefix;
+	for (let i = 0; i < 20; i++) {
+		if (!text.includes(`<${token}>`) && !text.includes(`</${token}>`)) {
+			return `<${token}>\n${text}\n</${token}>`;
+		}
+		token = `${prefix}_${i + 1}`;
+	}
+	const hashed = `${prefix}_${hashText(text)}`;
+	return `<${hashed}>\n${text}\n</${hashed}>`;
+}
+
 export function composeInstructions(base: string, instructions: string): string {
 	const trimmed = instructions.trim();
 	if (trimmed === '') return base;

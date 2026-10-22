@@ -1,5 +1,5 @@
 import { untilAbort } from '../providers/abort';
-import { chatCompletionsUrl } from '../providers/openai-compatible';
+import { joinApiPath } from '../providers/endpoint';
 import { revealsSensitiveText } from '../providers/redact';
 import {
 	ProviderError,
@@ -117,8 +117,7 @@ export function audioUrl(
 	baseUrl: string,
 	path: 'audio/transcriptions' | 'audio/speech',
 ): string {
-	const chat = chatCompletionsUrl(baseUrl);
-	return `${chat.slice(0, -'/chat/completions'.length)}/${path}`;
+	return joinApiPath(baseUrl, path);
 }
 
 async function postAudio(

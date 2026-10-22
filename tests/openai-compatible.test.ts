@@ -228,6 +228,24 @@ describe('OpenAICompatibleProvider', () => {
 		);
 	});
 
+	it('keeps the API path when a fragment or query would replace it', () => {
+		expect(chatCompletionsUrl('http://127.0.0.1:11434/v1#')).toBe(
+			'http://127.0.0.1:11434/v1/chat/completions',
+		);
+		expect(() =>
+			chatCompletionsUrl('http://169.254.169.254/latest/meta-data#'),
+		).toThrow(/metadata/);
+		expect(chatCompletionsUrl('http://127.0.0.1:11434/v1?x=1')).toBe(
+			'http://127.0.0.1:11434/v1/chat/completions',
+		);
+	});
+
+	it('rejects a URL whose userinfo points the request at another host', () => {
+		expect(() => chatCompletionsUrl('http://127.0.0.1:11434@evil.example/v1')).toThrow(
+			/username or password/,
+		);
+	});
+
 	it('drops a short note and a short fragment from the error', async () => {
 		const short = await provider(async () => ({
 			status: 400,

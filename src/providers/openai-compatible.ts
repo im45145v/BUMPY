@@ -1,4 +1,5 @@
 import { untilAbort } from './abort';
+import { joinApiPath } from './endpoint';
 import { revealsSensitiveText, secretsFrom } from './redact';
 import {
 	ProviderError,
@@ -60,23 +61,7 @@ export class OpenAICompatibleProvider implements AIProvider {
 }
 
 export function chatCompletionsUrl(baseUrl: string): string {
-	let trimmed = baseUrl.trim().replace(/\/+$/, '');
-	if (trimmed.endsWith('/chat/completions')) {
-		trimmed = trimmed.slice(0, -'/chat/completions'.length).replace(/\/+$/, '');
-	}
-
-	let url: URL;
-	try {
-		url = new URL(trimmed);
-	} catch {
-		throw new ProviderError('The provider URL is not valid.');
-	}
-	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-		throw new ProviderError(
-			'The provider URL must start with http:// or https://.',
-		);
-	}
-	return `${trimmed}/chat/completions`;
+	return joinApiPath(baseUrl, 'chat/completions');
 }
 
 function failureMessage(

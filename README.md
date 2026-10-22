@@ -41,7 +41,7 @@ An instruction file is skipped when it is empty, contains a null character, or i
 
 ## Speech
 
-**Speech to text** and **Text to speech** default to **On this device**, which uses the browser speech APIs and does not send audio or text to a provider.
+**Speech to text** and **Text to speech** default to **App speech service**. Speech to text uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. It does not use the provider URL. Text to speech uses the app's speech synthesis.
 
 **Provider audio API** sends audio to `{Provider URL}/audio/transcriptions` and text to `{Provider URL}/audio/speech`. The API key is sent as a header. Set the transcription model, speech model, and voice for that route. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up.
 
@@ -55,7 +55,7 @@ Tasks are ordinary Markdown lines, for example `- [ ] Pay rent 📅 2026-10-23`.
 
 Reminders are in-app notices. They start about a minute after Obsidian loads, use the reminder hour when a task has no time, and fire once per session for tasks due within the last 36 hours. Bumpy does not use the operating system’s notification API.
 
-**Sync calendar** does nothing until **Google calendar ID** and **Google access token** are set. The token is stored in plugin data and is not written into notes. Bumpy does not refresh the token. Events that Bumpy did not create are left alone. When a linked task and its event have both changed, the review lists **Keep the note** and **Use the calendar**. A conflict with no choice is skipped.
+**Sync calendar** does nothing until **Google calendar ID** and **Google access token** are set. The token is stored in plugin data and is not written into notes. Bumpy does not refresh the token. Events that Bumpy did not create are left alone. A task that already has a linked event is not given a second event when that event is outside the checked range. When a linked task and its event have both changed, the review lists **Keep the note** and **Use the calendar**. A conflict with no choice is skipped.
 
 ## Vault questions
 
@@ -63,7 +63,7 @@ Reminders are in-app notices. They start about a minute after Obsidian loads, us
 
 **Embeddings** defaults to **Local hashing**. That mode stays on device and matches shared words. It is not a neural embedding model. **Provider embeddings** send passages to `{Provider URL}/embeddings` with the embedding model you set.
 
-**Ask the vault** retrieves matching passages and, when a chat model is set, asks that model to answer only from those passages. Passages are treated as untrusted data. The answer lists source notes, and **Open note** jumps to one. **Insert** writes the answer only at the cursor you still have, and only if the note has not changed.
+**Ask the vault** retrieves matching passages and, when a chat model is set, asks that model to answer only from those passages. Passages from excluded folders or from notes that are no longer in the vault are skipped, even when an older index still contains them. Passages are treated as untrusted data. The answer lists source notes, and **Open note** jumps to one. **Insert** writes the answer only at the cursor you still have, and only if the note has not changed.
 
 ## Research
 

@@ -1,4 +1,4 @@
-import { composeInstructions } from '../instructions/policy';
+import { composeInstructions, wrapUntrusted } from '../instructions/policy';
 import type { ChatMessage } from '../providers/types';
 import type { StoredChunk } from './index';
 
@@ -17,17 +17,17 @@ export function buildAskMessages(
 	instructions = '',
 ): ChatMessage[] {
 	const passages = chunks
-		.map((chunk, index) => {
-			const token = `passage_${index + 1}`;
-			return [
-				`Note: ${chunk.title}`,
-				`Path: ${chunk.path}`,
-				`Heading: ${chunk.heading}`,
-				`<${token}>`,
-				chunk.text,
-				`</${token}>`,
-			].join('\n');
-		})
+		.map((chunk, index) =>
+			wrapUntrusted(
+				`passage_${index + 1}`,
+				[
+					`Note: ${chunk.title}`,
+					`Path: ${chunk.path}`,
+					`Heading: ${chunk.heading}`,
+					chunk.text,
+				].join('\n'),
+			),
+		)
 		.join('\n\n');
 	return [
 		{ role: 'system', content: composeInstructions(ASK_RULES, instructions) },

@@ -1,4 +1,4 @@
-import { composeInstructions } from '../instructions/policy';
+import { composeInstructions, wrapUntrusted } from '../instructions/policy';
 import type { ChatMessage } from '../providers/types';
 
 const INTERPRET_RULES = [
@@ -25,15 +25,16 @@ export function buildResearchNote(input: {
 	related: readonly { title: string; path: string }[];
 }): string {
 	const sources = input.hits
-		.map((hit, index) => {
-			const snippet = hit.snippet.trim();
-			return `${index + 1}. [${hit.title}](${hit.url})${snippet ? `\n   ${snippet}` : ''}`;
-		})
+		.map((hit, index) => sourceLine(index + 1, hit))
+		.filter((line) => line !== '')
 		.join('\n');
 	const related =
 		input.related.length === 0
 			? 'None found.'
-			: input.related.map((note) => `- [[${note.title}]]`).join('\n');
+			: input.related
+					.map((note) => wikilink(note.title))
+					.filter((line) => line !== '')
+					.join('\n') || 'None found.';
 	const interpretation =
 		input.interpretation === null
 			? 'No interpretation was generated.'
@@ -72,10 +73,9 @@ export function buildInterpretationMessages(
 	instructions = '',
 ): ChatMessage[] {
 	const sources = hits
-		.map((hit, index) => {
-			const token = `source_${index + 1}`;
-			return `<${token}>\n${hit.title}\n${hit.snippet}\n</${token}>`;
-		})
+		.map((hit, index) =>
+			wrapUntrusted(`source_${index + 1}`, `${hit.title}\n${hit.snippet}`),
+		)
 		.join('\n\n');
 	return [
 		{ role: 'system', content: composeInstructions(INTERPRET_RULES, instructions) },
@@ -83,9 +83,57 @@ export function buildInterpretationMessages(
 	];
 }
 
+export function isCitationUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return (
+			(url.protocol === 'http:' || url.protocol === 'https:') &&
+			url.username === '' &&
+			url.password === ''
+		);
+	} catch {
+		return false;
+	}
+}
+
 export function stripUnknownUrls(text: string, allowed: readonly string[]): string {
 	const ok = new Set(allowed);
-	return text.replace(/https?:\/\/[^\s)]+/g, (url) => (ok.has(url.replace(/[.,]+$/, '')) ? url : '[link removed]'));
+	return text.replace(/https?:\/\/[^\s)]+/gi, (url) => {
+		const bare = url.replace(/[.,]+$/, '');
+		return ok.has(bare) || ok.has(url) ? url : '[link removed]';
+	});
+}
+
+function sourceLine(index: number, hit: SearchHit): string {
+	if (!isCitationUrl(hit.url)) return '';
+	const url = new URL(hit.url);
+	const title = linkTitle(hit.title);
+	const snippet = quotedSnippet(hit.snippet);
+	const link = `${index}. [${title}](${url.href})`;
+	return snippet ? `${link}\n   ${snippet}` : link;
+}
+
+function linkTitle(value: string): string {
+	const title = value
+		.replace(/[\r\n]+/g, ' ')
+		.replace(/https?:\/\/\S+/gi, '')
+		.replace(/[[\]]/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+	return title || 'Untitled source';
+}
+
+function quotedSnippet(value: string): string {
+	return value
+		.replace(/[\r\n]+/g, ' ')
+		.replace(/\]\(/g, '] (')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+function wikilink(title: string): string {
+	const safe = title.replace(/[[\]\r\n#|]/g, '').replace(/\s+/g, ' ').trim();
+	return safe ? `- [[${safe}]]` : '';
 }
 
 export function researchPath(topic: string): string {

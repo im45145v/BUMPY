@@ -1,4 +1,4 @@
-import { Notice, type Plugin } from 'obsidian';
+import { Notice, TFile, type Plugin } from 'obsidian';
 import { readInstructionFile } from '../instructions/obsidian';
 import { loadInstructions } from '../instructions/policy';
 import { insertReviewedText } from '../notes/insert';
@@ -13,6 +13,7 @@ import {
 	assembleIndex,
 	hashEmbed,
 	planReindex,
+	retrievableChunks,
 	searchChunks,
 	type StoredChunk,
 } from '../rag/index';
@@ -109,9 +110,20 @@ async function askVault(plugin: DataHost, question: string): Promise<void> {
 			new Notice('Update the vault index first.');
 			return;
 		}
+		const chunks = retrievableChunks(
+			index.chunks,
+			parseFolders(plugin.settings.excludedFolders),
+			(path) => plugin.app.vault.getAbstractFileByPath(path) instanceof TFile,
+		);
+		if (chunks.length === 0) {
+			new Notice(
+				'The indexed notes are excluded or no longer in the vault. Update the vault index.',
+			);
+			return;
+		}
 		const [query] = await embedPassages(plugin, [question], controller.signal);
 		if (!query || controller.signal.aborted) return;
-		const matches = searchChunks(index.chunks, query, 5);
+		const matches = searchChunks(chunks, query, 5);
 		if (matches.length === 0) {
 			new Notice('Nothing in the index matches that question.');
 			return;

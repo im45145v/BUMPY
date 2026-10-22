@@ -15,14 +15,26 @@ export async function listGoogleEvents(
 	timeMax: string,
 	signal?: AbortSignal,
 ): Promise<TrackedEvent[]> {
-	const url = new URL(
-		`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
-	);
-	url.searchParams.set('singleEvents', 'true');
-	url.searchParams.set('timeMin', timeMin);
-	url.searchParams.set('timeMax', timeMax);
-	const body = await googleRequest(http, url.toString(), token, 'GET', undefined, signal);
-	return readEvents(body);
+	const events: TrackedEvent[] = [];
+	const seenTokens = new Set<string>();
+	let pageToken = '';
+	for (let page = 0; page < 20; page++) {
+		const url = new URL(
+			`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+		);
+		url.searchParams.set('singleEvents', 'true');
+		url.searchParams.set('maxResults', '250');
+		url.searchParams.set('timeMin', timeMin);
+		url.searchParams.set('timeMax', timeMax);
+		if (pageToken) url.searchParams.set('pageToken', pageToken);
+		const body = await googleRequest(http, url.toString(), token, 'GET', undefined, signal);
+		events.push(...readEvents(body));
+		const next = nextPageToken(body);
+		if (!next || seenTokens.has(next)) return events;
+		seenTokens.add(next);
+		pageToken = next;
+	}
+	return events;
 }
 
 export async function createGoogleEvent(
@@ -142,6 +154,19 @@ function failure(status: number, body: string, token: string): string {
 	if (status === 401) return 'Google Calendar declined the access token.';
 	if (detail) return `Google Calendar request failed (${status}). ${detail}`;
 	return `Google Calendar request failed (${status}).`;
+}
+
+function nextPageToken(body: string): string {
+	try {
+		const parsed: unknown = JSON.parse(body);
+		const token =
+			parsed && typeof parsed === 'object'
+				? (parsed as { nextPageToken?: unknown }).nextPageToken
+				: undefined;
+		return typeof token === 'string' ? token : '';
+	} catch {
+		return '';
+	}
 }
 
 function readEvents(body: string): TrackedEvent[] {
