@@ -7,6 +7,7 @@ import type { CleanupEditor, EditorPosition } from '../notes/editor-apply';
 import { insertReviewedText } from '../notes/insert';
 import { proposeCleanup } from '../notes/cleanup-session';
 import { createProvider } from '../providers/create-provider';
+import { resolveFeature } from '../providers/features';
 import { CleanupPreviewModal } from './preview-modal';
 
 export class DictateModal extends Modal {
@@ -148,11 +149,12 @@ export class DictateModal extends Modal {
 			this.host.app.workspace.getActiveFile()?.path ?? '',
 			(path) => readInstructionFile(this.host.app, path),
 		);
+		const endpoint = resolveFeature(this.host.settings, 'cleanup');
 		const proposal = await proposeCleanup(
 			this.transcript,
 			'selection',
-			this.host.settings.model,
-			(request) => createProvider(this.host.settings).complete(request),
+			endpoint.model,
+			(request) => createProvider(endpoint).complete(request),
 			{ signal: this.controller.signal, instructions: instructions.text },
 		);
 		if (this.controller.signal.aborted || proposal.status === 'cancelled') return;

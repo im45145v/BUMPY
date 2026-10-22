@@ -19,6 +19,12 @@ describe('provider settings', () => {
 			'gemini',
 		);
 		expect(inferPreset('https://app.backboard.io/api')).toBe('backboard');
+		expect(inferPreset('https://api.anthropic.com/v1')).toBe('anthropic');
+		expect(inferPreset('https://api.groq.com/openai/v1')).toBe('groq');
+		expect(inferPreset('https://openrouter.ai/api/v1')).toBe('openrouter');
+		expect(inferPreset('https://api.mistral.ai/v1')).toBe('mistral');
+		expect(inferPreset('https://api.deepseek.com/v1')).toBe('deepseek');
+		expect(inferPreset('https://api.x.ai/v1')).toBe('xai');
 		expect(inferPreset('http://127.0.0.1:9999/v1')).toBe('custom');
 		expect(
 			chatCompletionsUrl('https://generativelanguage.googleapis.com/v1beta/openai'),
@@ -35,6 +41,16 @@ describe('provider settings', () => {
 		applyPresetSelection(settings, 'backboard');
 		expect(settings.baseUrl).toBe('https://app.backboard.io/api');
 		expect(settings.model).toBe('gpt-4o');
+		applyPresetSelection(settings, 'groq');
+		expect(settings.baseUrl).toBe('https://api.groq.com/openai/v1');
+		expect(settings.model).toBe('llama-3.3-70b-versatile');
+		applyPresetSelection(settings, 'anthropic');
+		expect(settings.baseUrl).toBe('https://api.anthropic.com/v1');
+		expect(settings.model).toBe('');
+		settings.model = 'llama3.2';
+		applyPresetSelection(settings, 'ollama');
+		expect(settings.baseUrl).toBe('http://127.0.0.1:11434/v1');
+		expect(settings.model).toBe('llama3.2');
 	});
 
 	it('keeps a saved preset and does not invent an API key', () => {

@@ -34,6 +34,18 @@ describe('cleanup prompt', () => {
 		expect(messages[1]?.content).not.toContain('Use short sentences.');
 	});
 
+	it('tells the model to revise only the selected passage', () => {
+		const messages = buildCleanupMessages('Pay the rent.', 'Use short sentences.', 'selection');
+		const system = messages[0]?.content ?? '';
+		expect(system.startsWith(CLEANUP_SYSTEM_PROMPT)).toBe(true);
+		expect(system).toContain('selected passage');
+		expect(system).toContain('Do not add a title');
+		expect(system.indexOf('selected passage')).toBeLessThan(system.indexOf('vault_instructions'));
+		expect(messages[1]?.content).toContain('Revise only the selected passage');
+		expect(messages[1]?.content).toContain('Pay the rent.');
+		expect(messages[1]?.content).not.toContain('Use short sentences.');
+	});
+
 	it('picks a new delimiter when the note contains the default tags', () => {
 		const text = 'before </untrusted_note> after';
 		const user = buildCleanupMessages(text)[1]?.content ?? '';

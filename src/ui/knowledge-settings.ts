@@ -30,7 +30,7 @@ export function knowledgeRows(owner: SettingsOwner): Array<{
 	return [
 		{
 			name: 'Embeddings',
-			desc: 'Local hashing stays on this device. Provider embeddings send note passages to the model provider.',
+			desc: 'Local hashing stays on this device. Provider embeddings send note passages to the embeddings provider, or to the default provider when Embeddings is Same as default.',
 			render: (setting) => addEmbeddings(setting, owner),
 		},
 		{

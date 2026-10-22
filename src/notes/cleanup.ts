@@ -4,6 +4,15 @@ import type { ChatMessage } from '../providers/types';
 export const MAX_CLEANUP_CHARS = 100_000;
 export const CLEANUP_TEMPERATURE = 0.2;
 
+export type CleanupTarget = 'selection' | 'note';
+
+const SELECTION_RULES = [
+	'The user message is one selected passage, not a whole note.',
+	'Return only the revised passage.',
+	'Do not add a title, frontmatter, headings, or sentences that were not in the selection.',
+	'The result replaces that selection in place.',
+].join('\n');
+
 export const CLEANUP_SYSTEM_PROMPT = [
 	'You revise Markdown for an Obsidian vault.',
 	'Return only the revised Markdown, with no introduction, explanation, or surrounding code fence.',
@@ -18,10 +27,7 @@ export const CLEANUP_SYSTEM_PROMPT = [
 
 const OUTER_FENCE = /^```(?:markdown|md)?[ \t]*\n([\s\S]*)\n```[ \t]*$/;
 
-export function cleanupInputError(
-	text: string,
-	mode: 'selection' | 'note',
-): string | null {
+export function cleanupInputError(text: string, mode: CleanupTarget): string | null {
 	if (text.trim() === '') {
 		return mode === 'note'
 			? 'This note is empty.'
@@ -41,16 +47,25 @@ export function modelSettingError(model: string): string | null {
 export function buildCleanupMessages(
 	text: string,
 	instructions = '',
+	mode: CleanupTarget = 'note',
 ): ChatMessage[] {
 	const token = delimiterFor(text);
+	const base =
+		mode === 'selection'
+			? `${CLEANUP_SYSTEM_PROMPT}\n${SELECTION_RULES}`
+			: CLEANUP_SYSTEM_PROMPT;
+	const lead =
+		mode === 'selection'
+			? 'Revise only the selected passage below.'
+			: 'Revise the note content below.';
 	return [
 		{
 			role: 'system',
-			content: composeInstructions(CLEANUP_SYSTEM_PROMPT, instructions),
+			content: composeInstructions(base, instructions),
 		},
 		{
 			role: 'user',
-			content: `Revise the note content below.\n\n<${token}>\n${text}\n</${token}>`,
+			content: `${lead}\n\n<${token}>\n${text}\n</${token}>`,
 		},
 	];
 }

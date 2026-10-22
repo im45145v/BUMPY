@@ -117,10 +117,12 @@ function responding(body: string) {
 describe('cleanup commands', () => {
 	it('registers selection and whole-note cleanup', () => {
 		expect(CLEANUP_COMMANDS.map((command) => command.id)).toEqual([
+			'cleanup',
 			'cleanup-selection',
 			'cleanup-note',
 		]);
 		expect(CLEANUP_COMMANDS.map((command) => command.mode)).toEqual([
+			'auto',
 			'selection',
 			'note',
 		]);
@@ -164,6 +166,30 @@ describe('executeCleanup', () => {
 		expect(editor.getValue()).toContain('![[attachment.png]]');
 		expect(session.apply().ok).toBe(false);
 		expect(editor.replacements).toBe(1);
+	});
+
+	it('cleans only the selection when text is selected', async () => {
+		const line = 2;
+		const editor = new FakeEditor(NOTE, selectionOf(NOTE, line));
+		const provider = responding('Read the line.');
+		const session = await executeCleanup(editor, 'auto', 'llama3.2', provider.complete);
+		expect(session.status).toBe('preview');
+		if (session.status !== 'preview') return;
+		expect(session.target).toBe('selection');
+		expect(provider.requests[0]?.messages[1]?.content).toContain(editor.getLine(line));
+		expect(provider.requests[0]?.messages[1]?.content).not.toContain('# Heading');
+		expect(provider.requests[0]?.messages[1]?.content).toContain('selected passage');
+	});
+
+	it('cleans the whole note when nothing is selected', async () => {
+		const editor = new FakeEditor(NOTE);
+		const provider = responding(CLEANED);
+		const session = await executeCleanup(editor, 'auto', 'llama3.2', provider.complete);
+		expect(session.status).toBe('preview');
+		if (session.status !== 'preview') return;
+		expect(session.target).toBe('note');
+		expect(provider.requests[0]?.messages[1]?.content).toContain('# Heading');
+		expect(provider.requests[0]?.messages[1]?.content).toContain('Revise the note content');
 	});
 
 	it('cleans a whole note and keeps markdown structures', async () => {

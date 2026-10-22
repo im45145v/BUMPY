@@ -4,6 +4,7 @@ import { loadInstructions } from '../instructions/policy';
 import { parseFolders, relatedNotes } from '../linking/suggest';
 import { cancelled } from '../providers/abort';
 import { createProvider } from '../providers/create-provider';
+import { resolveFeature } from '../providers/features';
 import { obsidianHttp } from '../providers/obsidian-http';
 import { ProviderError } from '../providers/types';
 import { localIsoDate } from '../insights/report';
@@ -115,7 +116,8 @@ async function interpret(
 	instructions: string,
 	signal: AbortSignal,
 ): Promise<{ text: string | null; warnings: string[] }> {
-	if (plugin.settings.model.trim() === '') {
+	const endpoint = resolveFeature(plugin.settings, 'research');
+	if (endpoint.model.trim() === '') {
 		return {
 			text: null,
 			warnings: ['Set a model in settings to add an interpretation.'],
@@ -123,8 +125,8 @@ async function interpret(
 	}
 	if (hits.length === 0) return { text: null, warnings: [] };
 	try {
-		const text = await createProvider(plugin.settings).complete({
-			model: plugin.settings.model,
+		const text = await createProvider(endpoint).complete({
+			model: endpoint.model,
 			temperature: 0,
 			messages: buildInterpretationMessages(topic, hits, instructions),
 			signal,

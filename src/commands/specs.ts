@@ -6,6 +6,11 @@ export const CLEANUP_COMMANDS: Array<{
 	mode: CleanupMode;
 }> = [
 	{
+		id: 'cleanup',
+		name: 'Clean up',
+		mode: 'auto',
+	},
+	{
 		id: 'cleanup-selection',
 		name: 'Clean up selection',
 		mode: 'selection',

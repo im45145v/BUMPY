@@ -13,6 +13,7 @@ import {
 	type BumpySettings,
 	type SettingsOwner,
 } from '../settings';
+import { featureProviderRows } from './feature-providers';
 import { knowledgeRows, renderKnowledgeSettings } from './knowledge-settings';
 import { renderSpeechSettings, speechRows } from './speech-settings';
 import { renderTaskSettings, taskRows } from './task-settings';
@@ -71,6 +72,7 @@ export class BumpySettingTab extends PluginSettingTab {
 				desc: 'Asks the provider for its model list. The API key is not shown.',
 				render: (setting) => this.addConnectionCheck(setting),
 			},
+			...featureProviderRows(this.owner),
 			...speechRows(this.owner),
 			...taskRows(this.owner),
 			...knowledgeRows(this.owner),
@@ -136,6 +138,9 @@ export class BumpySettingTab extends PluginSettingTab {
 				.setName('Connection')
 				.setDesc('Asks the provider for its model list. The API key is not shown.'),
 		);
+		for (const row of featureProviderRows(this.owner)) {
+			row.render(new Setting(containerEl).setName(row.name).setDesc(row.desc));
+		}
 		renderSpeechSettings(containerEl, this.owner);
 		renderTaskSettings(containerEl, this.owner);
 		renderKnowledgeSettings(containerEl, this.owner);
@@ -203,10 +208,10 @@ export class BumpySettingTab extends PluginSettingTab {
 }
 
 const PROVIDER_DESC =
-	'Choosing a provider fills its usual URL and, for Gemini and Backboard, a starting model. Choose Custom to keep the URL as you typed it.';
+	'Choosing a provider fills its usual URL and, when one is known, a starting model. Choose Custom to keep the URL as you typed it. Each feature below can use a different provider.';
 
 const PROVIDER_URL_DESC =
-	'Gemini uses its OpenAI-compatible URL. Backboard uses its own API. Leave the API key empty for a local server that does not require one.';
+	'OpenAI-compatible providers, including Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, and xAI, use this base URL. Backboard uses its own API. Leave the API key empty for a local server that does not require one.';
 
 const API_KEY_DESC =
 	"Stored in this vault's plugin data on this device. It is not written into notes.";

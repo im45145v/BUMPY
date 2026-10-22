@@ -3,6 +3,7 @@ import { App, ButtonComponent, Modal } from 'obsidian';
 export interface CleanupPreview {
 	original: string;
 	proposed: string;
+	note?: string;
 	warnings?: readonly string[];
 	onApply: () => boolean;
 }
@@ -22,7 +23,8 @@ export class CleanupPreviewModal extends Modal {
 		this.setTitle('Review cleanup');
 
 		contentEl.createEl('p', {
-			text: 'Nothing is written until you apply this proposal.',
+			text:
+				this.preview.note ?? 'Nothing is written until you apply this proposal.',
 			cls: 'bumpy-preview-note',
 		});
 

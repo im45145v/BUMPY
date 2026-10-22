@@ -16,7 +16,9 @@ export function registerCommands(
 				const enabled =
 					command.mode === 'selection'
 						? canCleanSelection(editor)
-						: canCleanNote(editor);
+						: command.mode === 'auto'
+							? canCleanSelection(editor) || canCleanNote(editor)
+							: canCleanNote(editor);
 				if (!enabled) return false;
 				if (!checking) void runCleanup(plugin, editor, command.mode);
 				return true;

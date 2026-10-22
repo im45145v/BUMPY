@@ -1,9 +1,10 @@
 import { Notice, type App } from 'obsidian';
 import { readInstructionFile } from '../instructions/obsidian';
 import { loadInstructions } from '../instructions/policy';
-import type { CleanupEditor } from '../notes/editor-apply';
+import { selectionRange, type CleanupEditor } from '../notes/editor-apply';
 import { executeCleanup, type CleanupMode } from '../notes/cleanup-session';
 import { createProvider } from '../providers/create-provider';
+import { resolveFeature } from '../providers/features';
 import { cancelOnClick } from '../requests/dismiss';
 import type { RequestScope } from '../requests/scope';
 import type { BumpySettings } from '../settings';
@@ -21,7 +22,12 @@ export async function runCleanup(
 	mode: CleanupMode,
 ): Promise<void> {
 	const controller = host.requests.start();
-	const pending = cleanupNotice(controller);
+	const cleaningSelection =
+		mode === 'selection' || (mode === 'auto' && selectionRange(editor) !== null);
+	const pending = cleanupNotice(
+		controller,
+		cleaningSelection ? 'Cleaning up the selection… ' : 'Cleaning up the note… ',
+	);
 	const notice = new Notice(pending.fragment, 0);
 	const surface =
 		pending.button.parentElement?.parentElement ??
@@ -37,11 +43,12 @@ export async function runCleanup(
 			(path) => readInstructionFile(host.app, path),
 		);
 		instructionWarnings = instructions.warnings;
+		const endpoint = resolveFeature(host.settings, 'cleanup');
 		session = await executeCleanup(
 			editor,
 			mode,
-			host.settings.model,
-			(request) => createProvider(host.settings).complete(request),
+			endpoint.model,
+			(request) => createProvider(endpoint).complete(request),
 			{ signal: controller.signal, instructions: instructions.text },
 		);
 	} finally {
@@ -61,6 +68,10 @@ export async function runCleanup(
 	new CleanupPreviewModal(host.app, {
 		original: session.original,
 		proposed: session.proposed,
+		note:
+			session.target === 'selection'
+				? 'This replaces only the selected text. Nothing is written until you apply.'
+				: 'This replaces the whole note. Nothing is written until you apply.',
 		warnings: [...instructionWarnings, ...session.warnings],
 		onApply: () => {
 			const decision = session.apply();
@@ -73,12 +84,15 @@ export async function runCleanup(
 	}).open();
 }
 
-function cleanupNotice(controller: AbortController): {
+function cleanupNotice(
+	controller: AbortController,
+	label: string,
+): {
 	fragment: DocumentFragment;
 	button: HTMLButtonElement;
 } {
 	const fragment = createFragment();
-	fragment.createSpan({ text: 'Cleaning up… ' });
+	fragment.createSpan({ text: label });
 	const button = fragment.createEl('button', {
 		text: 'Cancel',
 		cls: 'bumpy-notice-cancel',

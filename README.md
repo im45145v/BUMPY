@@ -6,7 +6,8 @@ These commands are available from the command palette:
 
 | Command | What it does |
 |---|---|
-| **Clean up selection** / **Clean up note** | Asks the model to revise the selection or the note, then previews the change |
+| **Clean up** | Cleans the selection when text is selected, and the whole note when it is not. Previews the change before writing |
+| **Clean up selection** / **Clean up note** | Cleans only the selection, or the whole note even when text is selected |
 | **Dictate** | Records speech, lets you edit the transcript, then inserts it or sends it through cleanup |
 | **Read selection** / **Read note** | Speaks the selection or the note |
 | **Suggest links** / **Show related notes** | Suggests wikilinks and lists related notes and backlinks |
@@ -21,19 +22,34 @@ These commands are available from the command palette:
 
 ## Provider
 
-Bumpy talks to an OpenAI-compatible chat endpoint. That covers a local server such as Ollama, OpenAI, and Gemini. **Backboard** uses Backboard’s own message API with the same key field.
+The provider at the top of **Settings → Bumpy** is the default. Cleanup, vault answers, research, speech, and embeddings can each keep that default or use a provider of their own. A writing model, a speech service, and an embedding model do not have to be the same service.
+
+| Provider | Usual URL |
+|---|---|
+| Ollama | `http://127.0.0.1:11434/v1` |
+| LM Studio | `http://127.0.0.1:1234/v1` |
+| OpenAI | `https://api.openai.com/v1` |
+| Anthropic | `https://api.anthropic.com/v1` |
+| Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| Groq | `https://api.groq.com/openai/v1` |
+| OpenRouter | `https://openrouter.ai/api/v1` |
+| Mistral | `https://api.mistral.ai/v1` |
+| DeepSeek | `https://api.deepseek.com/v1` |
+| xAI | `https://api.x.ai/v1` |
+| Backboard | `https://app.backboard.io/api` |
+
+OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, and xAI use the OpenAI chat format. Backboard uses its own message API. Choosing a provider fills its usual URL. Gemini, Groq, and Backboard also fill a starting model. **Custom** leaves the URL as you typed it. Set the model name the provider expects when no starting model is filled.
 
 In **Settings → Bumpy**:
 
-- **Provider** fills the usual URL for Ollama, LM Studio, OpenAI, Gemini, or Backboard. Gemini and Backboard also fill a starting model name. **Custom** leaves the URL as you typed it.
-- **Provider URL** is the base URL, for example `http://127.0.0.1:11434/v1`.
-- **Model** is the name that server expects.
-- **API key** is optional for a local server. Gemini and Backboard require their own keys. The key is stored in this vault’s plugin data on this device and is not written into notes. Gemini is sent as a bearer token. Backboard is sent as `X-API-Key`.
-- **Check connection** asks the provider for its model list. The key is sent only in the request header.
+- **Provider**, **Provider URL**, **Model**, and **API key** are the default used by every feature set to **Same as default**.
+- **Feature providers** gives Cleanup, Vault answers, Research, Speech, or Embeddings its own URL, model, and key. A feature uses its own key and does not reuse the default key.
+- **API key** is optional for a local server. Cloud providers need their own keys. Keys are stored in this vault’s plugin data on this device and are not written into notes. OpenAI-compatible providers receive the key as a bearer token. Backboard receives it as `X-API-Key`.
+- **Check connection** asks the default provider for its model list. **Check** on a feature does the same for that feature’s provider. The key is sent only in the request header.
 
-Gemini uses `https://generativelanguage.googleapis.com/v1beta/openai`. Backboard uses `https://app.backboard.io/api` and does not store the note in Backboard memory. Provider audio and provider embeddings stay on the OpenAI-compatible URL, so leave those on the local options when the provider is Backboard. Note text is still sent to Gemini or Backboard when you run cleanup, ask, or research.
+Backboard does not store the note in Backboard memory, and it does not provide audio or embeddings. Point **Speech** and **Embeddings** at another provider, or leave speech on **App speech service** and embeddings on **Local hashing**. Note text is sent to the provider for that feature when you run cleanup, ask, or research.
 
-Cleanup, answers, and research interpretation use that chat endpoint. Note text is sent only when you run one of those commands. Provider errors are redacted so they do not echo note text or the API key. Cancelling stops Bumpy from using the response. Obsidian’s request API cannot abort the underlying socket, so a cancelled request may still finish at the server.
+Provider errors are redacted so they do not echo note text or an API key. Cancelling stops Bumpy from using the response. Obsidian’s request API cannot abort the underlying socket, so a cancelled request may still finish at the server.
 
 ## Vault instructions
 
@@ -45,7 +61,7 @@ An instruction file is skipped when it is empty, contains a null character, or i
 
 **Speech to text** and **Text to speech** default to **App speech service**. Speech to text uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. It does not use the provider URL. Text to speech uses the app's speech synthesis.
 
-**Provider audio API** sends audio to `{Provider URL}/audio/transcriptions` and text to `{Provider URL}/audio/speech`. The API key is sent as a header. Set the transcription model, speech model, and voice for that route. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up.
+**Provider audio API** sends audio to the speech provider’s `/audio/transcriptions` route and text to its `/audio/speech` route. When **Speech** is **Same as default**, that is the default provider URL. The API key for that provider is sent as a header. Set the transcription model, speech model, and voice for that route. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up. Cleaning a transcript uses the cleanup provider.
 
 ## Links, tasks, and calendar
 
@@ -63,9 +79,9 @@ Reminders are in-app notices. They start about a minute after Obsidian loads, us
 
 **Update vault index** stores passage vectors in plugin data, not in the vault. Notes in excluded folders, notes longer than 200,000 characters, and notes with `bumpy-index: false` in frontmatter are left out. The index keeps up to 2,000 passages and updates a note only when its text or the embedding setting changes. Indexing does not run at startup.
 
-**Embeddings** defaults to **Local hashing**. That mode stays on device and matches shared words. It is not a neural embedding model. **Provider embeddings** send passages to `{Provider URL}/embeddings` with the embedding model you set.
+**Embeddings** defaults to **Local hashing**. That mode stays on device and matches shared words. It is not a neural embedding model. **Provider embeddings** send passages to the embeddings provider’s `/embeddings` route with the embedding model you set. When **Embeddings** is **Same as default**, that is the default provider URL. Changing the embeddings provider rebuilds passages the next time you update the index.
 
-**Ask the vault** retrieves matching passages and, when a chat model is set, asks that model to answer only from those passages. Passages from excluded folders or from notes that are no longer in the vault are skipped, even when an older index still contains them. Passages are treated as untrusted data. The answer lists source notes, and **Open note** jumps to one. **Insert** writes the answer only at the cursor you still have, and only if the note has not changed.
+**Ask the vault** retrieves matching passages and, when the vault-answers model is set, asks that model to answer only from those passages. Passages from excluded folders or from notes that are no longer in the vault are skipped, even when an older index still contains them. Passages are treated as untrusted data. The answer lists source notes, and **Open note** jumps to one. **Insert** writes the answer only at the cursor you still have, and only if the note has not changed.
 
 ## Research
 

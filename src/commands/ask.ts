@@ -5,6 +5,7 @@ import { insertReviewedText } from '../notes/insert';
 import type { CleanupEditor } from '../notes/editor-apply';
 import { cancelled } from '../providers/abort';
 import { createProvider } from '../providers/create-provider';
+import { embeddingIndexModel, resolveFeature } from '../providers/features';
 import { obsidianHttp } from '../providers/obsidian-http';
 import { usesBackboard } from '../providers/presets';
 import { ProviderError } from '../providers/types';
@@ -63,9 +64,13 @@ async function updateIndex(plugin: DataHost): Promise<void> {
 			parseFolders(plugin.settings.excludedFolders),
 		);
 		const existing = await loadStoredIndex(() => plugin.loadData());
+		const embeddings = resolveFeature(plugin.settings, 'embeddings');
 		const mode = {
 			embeddings: plugin.settings.embeddings,
-			model: plugin.settings.embeddingModel.trim(),
+			model:
+				plugin.settings.embeddings === 'provider'
+					? embeddingIndexModel(plugin.settings.embeddingModel, embeddings)
+					: '',
 		};
 		const plan = planReindex(
 			existing,
@@ -133,11 +138,12 @@ async function askVault(plugin: DataHost, question: string): Promise<void> {
 			plugin.app.workspace.getActiveFile()?.path ?? '',
 			(path) => readInstructionFile(plugin.app, path),
 		);
+		const answers = resolveFeature(plugin.settings, 'ask');
 		let answer = 'No model is set, so this is only the retrieved passages.';
-		if (plugin.settings.model.trim() !== '') {
+		if (answers.model.trim() !== '') {
 			try {
-				answer = await createProvider(plugin.settings).complete({
-					model: plugin.settings.model,
+				answer = await createProvider(answers).complete({
+					model: answers.model,
 					temperature: 0,
 					messages: buildAskMessages(question, matches, instructions.text),
 					signal: controller.signal,
@@ -183,16 +189,17 @@ async function embedPassages(
 ): Promise<number[][]> {
 	if (texts.length === 0) return [];
 	if (plugin.settings.embeddings === 'local') return texts.map((text) => hashEmbed(text));
-	if (usesBackboard(plugin.settings.preset, plugin.settings.baseUrl)) {
+	const endpoint = resolveFeature(plugin.settings, 'embeddings');
+	if (usesBackboard(endpoint.preset, endpoint.baseUrl)) {
 		throw new ProviderError(
-			'Backboard does not embed vault notes. Keep embeddings on local hashing.',
+			'Backboard does not embed vault notes. Choose another embeddings provider, or keep embeddings on local hashing.',
 		);
 	}
 	return embedInBatches(texts, (batch) =>
 		embedWithProvider(
 			obsidianHttp,
-			plugin.settings.baseUrl,
-			plugin.settings.apiKey,
+			endpoint.baseUrl,
+			endpoint.apiKey,
 			plugin.settings.embeddingModel,
 			batch,
 			signal,

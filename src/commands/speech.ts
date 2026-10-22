@@ -13,6 +13,7 @@ import { synthesizeSpeech, transcribeAudio } from '../audio/openai-audio';
 import { playAudioBytes } from '../audio/playback';
 import { readAloud } from '../audio/speak';
 import { selectionRange, type CleanupEditor } from '../notes/editor-apply';
+import { resolveFeature } from '../providers/features';
 import { obsidianHttp } from '../providers/obsidian-http';
 import { usesBackboard } from '../providers/presets';
 import { ProviderError } from '../providers/types';
@@ -112,14 +113,15 @@ async function speakText(
 		await speakWithWebSpeech(text, signal);
 		return;
 	}
-	if (usesBackboard(host.settings.preset, host.settings.baseUrl)) {
+	const endpoint = resolveFeature(host.settings, 'speech');
+	if (usesBackboard(endpoint.preset, endpoint.baseUrl)) {
 		throw new ProviderError(
-			'Backboard does not provide the audio API. Use App speech service.',
+			'Backboard does not provide the audio API. Choose another speech provider, or use App speech service.',
 		);
 	}
 	const bytes = await synthesizeSpeech(obsidianHttp, text, host.settings.speechVoice, {
-		baseUrl: host.settings.baseUrl,
-		apiKey: host.settings.apiKey,
+		baseUrl: endpoint.baseUrl,
+		apiKey: endpoint.apiKey,
 		model: host.settings.speechModel,
 		signal,
 	});
@@ -128,21 +130,22 @@ async function speakText(
 
 function speechInput(host: CleanupHost): SpeechInputEngine {
 	if (host.settings.speechInput === 'openai-audio') {
-		if (usesBackboard(host.settings.preset, host.settings.baseUrl)) {
+		const endpoint = resolveFeature(host.settings, 'speech');
+		if (usesBackboard(endpoint.preset, endpoint.baseUrl)) {
 			return {
 				isSupported: () => true,
 				listen: () =>
 					Promise.reject(
 						new ProviderError(
-							'Backboard does not provide the audio API. Use App speech service.',
+							'Backboard does not provide the audio API. Choose another speech provider, or use App speech service.',
 						),
 					),
 			};
 		}
 		return createRecorderInput(new BrowserAudioRecorder(), (audio, mime, requestSignal) =>
 			transcribeAudio(obsidianHttp, audio, mime, {
-				baseUrl: host.settings.baseUrl,
-				apiKey: host.settings.apiKey,
+				baseUrl: endpoint.baseUrl,
+				apiKey: endpoint.apiKey,
 				model: host.settings.transcriptionModel,
 				signal: requestSignal,
 			}),

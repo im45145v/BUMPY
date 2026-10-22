@@ -1,4 +1,10 @@
 import {
+	defaultFeatures,
+	normalizeFeatures,
+	type FeatureId,
+	type FeatureProvider,
+} from './providers/features';
+import {
 	PROVIDER_PRESETS,
 	inferPreset,
 	isProviderPreset,
@@ -30,6 +36,7 @@ export interface BumpySettings {
 	searchApiKey: string;
 	journalFolder: string;
 	journalDays: number;
+	features: Record<FeatureId, FeatureProvider>;
 }
 
 export const DEFAULT_SETTINGS: BumpySettings = {
@@ -54,10 +61,14 @@ export const DEFAULT_SETTINGS: BumpySettings = {
 	searchApiKey: '',
 	journalFolder: 'Journal',
 	journalDays: 7,
+	features: defaultFeatures(),
 };
 
 export function normalizeSettings(
-	partial: Partial<BumpySettings> | null | undefined,
+	partial:
+		| (Partial<Omit<BumpySettings, 'features'>> & { features?: unknown })
+		| null
+		| undefined,
 ): BumpySettings {
 	const source = partial ?? {};
 	const baseUrl = textSetting(source.baseUrl, DEFAULT_SETTINGS.baseUrl);
@@ -93,6 +104,7 @@ export function normalizeSettings(
 		searchApiKey: textSetting(source.searchApiKey, ''),
 		journalFolder: textSetting(source.journalFolder, DEFAULT_SETTINGS.journalFolder),
 		journalDays: daySetting(source.journalDays),
+		features: normalizeFeatures(source.features),
 	};
 }
 
