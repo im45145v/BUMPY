@@ -24,12 +24,6 @@ export const FEATURES = [
 		chat: true,
 	},
 	{
-		id: 'speech',
-		label: 'Speech',
-		desc: 'Transcription and reading aloud. App speech service ignores this. Backboard has no audio API.',
-		chat: false,
-	},
-	{
 		id: 'embeddings',
 		label: 'Embeddings',
 		desc: 'Used when embeddings are set to the provider. Backboard cannot embed notes.',

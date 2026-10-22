@@ -3,8 +3,9 @@ import { RequestCancelledError } from '../providers/types';
 export function playAudioBytes(
 	bytes: ArrayBuffer,
 	signal: AbortSignal,
+	mime = 'audio/mpeg',
 ): Promise<void> {
-	const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+	const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
 	const audio = new Audio(url);
 	return new Promise((resolve, reject) => {
 		let settled = false;

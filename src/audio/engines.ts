@@ -231,6 +231,8 @@ export class BrowserAudioRecorder implements AudioRecorder {
 	private chunks: Blob[] = [];
 	private stream: MediaStream | null = null;
 
+	constructor(private readonly mimeType = '') {}
+
 	isSupported(): boolean {
 		return (
 			typeof MediaRecorder !== 'undefined' &&
@@ -247,7 +249,13 @@ export class BrowserAudioRecorder implements AudioRecorder {
 			throw new Error('The microphone permission was denied.');
 		}
 		this.stream = stream;
-		const recorder = new MediaRecorder(stream);
+		const mime =
+			this.mimeType &&
+			typeof MediaRecorder !== 'undefined' &&
+			MediaRecorder.isTypeSupported(this.mimeType)
+				? this.mimeType
+				: '';
+		const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
 		this.chunks = [];
 		recorder.addEventListener('dataavailable', (event) => {
 			if (event.data.size > 0) this.chunks.push(event.data);

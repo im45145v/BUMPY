@@ -37,12 +37,6 @@ describe('feature providers', () => {
 					model: 'llama-3.3-70b-versatile',
 					apiKey: 'gsk-feature',
 				},
-				speech: {
-					source: 'openai',
-					baseUrl: 'https://api.openai.com/v1',
-					model: '',
-					apiKey: 'sk-speech',
-				},
 			},
 		});
 		const cleanup = resolveFeature(settings, 'cleanup');
@@ -51,11 +45,6 @@ describe('feature providers', () => {
 		expect(usesBackboard(cleanup.preset, cleanup.baseUrl)).toBe(false);
 		const answers = resolveFeature(settings, 'ask');
 		expect(usesBackboard(answers.preset, answers.baseUrl)).toBe(true);
-		expect(resolveFeature(settings, 'speech')).toMatchObject({
-			preset: 'openai',
-			baseUrl: 'https://api.openai.com/v1',
-			apiKey: 'sk-speech',
-		});
 		expect(settings.features.research.source).toBe('shared');
 	});
 

@@ -9,13 +9,12 @@ import {
 	speakWithWebSpeech,
 	type SpeechInputEngine,
 } from '../audio/engines';
-import { synthesizeSpeech, transcribeAudio } from '../audio/openai-audio';
+import { synthesizeCloud, transcribeCloud } from '../audio/cloud-speech';
+import { GRADIUM_RECORDING_TYPES } from '../audio/gradium-audio';
 import { playAudioBytes } from '../audio/playback';
 import { readAloud } from '../audio/speak';
 import { selectionRange, type CleanupEditor } from '../notes/editor-apply';
-import { resolveFeature } from '../providers/features';
 import { obsidianHttp } from '../providers/obsidian-http';
-import { usesBackboard } from '../providers/presets';
 import { ProviderError } from '../providers/types';
 import { cancelOnClick } from '../requests/dismiss';
 import { DictateModal } from '../ui/dictate-modal';
@@ -113,45 +112,34 @@ async function speakText(
 		await speakWithWebSpeech(text, signal);
 		return;
 	}
-	const endpoint = resolveFeature(host.settings, 'speech');
-	if (usesBackboard(endpoint.preset, endpoint.baseUrl)) {
-		throw new ProviderError(
-			'Backboard does not provide the audio API. Choose another speech provider, or use App speech service.',
-		);
-	}
-	const bytes = await synthesizeSpeech(obsidianHttp, text, host.settings.speechVoice, {
-		baseUrl: endpoint.baseUrl,
-		apiKey: endpoint.apiKey,
-		model: host.settings.speechModel,
-		signal,
-	});
-	await playAudioBytes(bytes, signal);
+	const spoken = await synthesizeCloud(host.settings, text, signal, obsidianHttp);
+	await playAudioBytes(spoken.bytes, signal, spoken.mime);
 }
 
 function speechInput(host: CleanupHost): SpeechInputEngine {
-	if (host.settings.speechInput === 'openai-audio') {
-		const endpoint = resolveFeature(host.settings, 'speech');
-		if (usesBackboard(endpoint.preset, endpoint.baseUrl)) {
-			return {
-				isSupported: () => true,
-				listen: () =>
-					Promise.reject(
-						new ProviderError(
-							'Backboard does not provide the audio API. Choose another speech provider, or use App speech service.',
-						),
-					),
-			};
-		}
-		return createRecorderInput(new BrowserAudioRecorder(), (audio, mime, requestSignal) =>
-			transcribeAudio(obsidianHttp, audio, mime, {
-				baseUrl: endpoint.baseUrl,
-				apiKey: endpoint.apiKey,
-				model: host.settings.transcriptionModel,
-				signal: requestSignal,
-			}),
-		);
+	if (host.settings.speechInput === 'web-speech') {
+		return createWebSpeechInput(browserSpeechRecognition);
 	}
-	return createWebSpeechInput(browserSpeechRecognition);
+	const mime = host.settings.speechInput === 'gradium' ? gradiumRecordingMime() : '';
+	if (host.settings.speechInput === 'gradium' && mime === '') {
+		return {
+			isSupported: () => true,
+			listen: () =>
+				Promise.reject(
+					new ProviderError(
+						'Gradium cannot transcribe the recording format from this app. Choose OpenAI, Groq, or Grok for speech to text.',
+					),
+				),
+		};
+	}
+	return createRecorderInput(new BrowserAudioRecorder(mime), (audio, recordedMime, requestSignal) =>
+		transcribeCloud(host.settings, audio, recordedMime, requestSignal, obsidianHttp),
+	);
+}
+
+function gradiumRecordingMime(): string {
+	if (typeof MediaRecorder === 'undefined') return '';
+	return GRADIUM_RECORDING_TYPES.find((mime) => MediaRecorder.isTypeSupported(mime)) ?? '';
 }
 
 function readingNotice(controller: AbortController): {

@@ -1,4 +1,10 @@
 import {
+	normalizeSpeechSetup,
+	type SpeechInput,
+	type SpeechKeys,
+	type SpeechOutput,
+} from './audio/speech-catalog';
+import {
 	defaultFeatures,
 	normalizeFeatures,
 	type FeatureId,
@@ -12,15 +18,14 @@ import {
 } from './providers/presets';
 import type { RequestScope } from './requests/scope';
 
-export type SpeechRoute = 'web-speech' | 'openai-audio';
-
 export interface BumpySettings {
 	preset: ProviderPreset;
 	baseUrl: string;
 	model: string;
 	apiKey: string;
-	speechInput: SpeechRoute;
-	speechOutput: SpeechRoute;
+	speechInput: SpeechInput;
+	speechOutput: SpeechOutput;
+	speechKeys: SpeechKeys;
 	transcriptionModel: string;
 	speechModel: string;
 	speechVoice: string;
@@ -46,6 +51,7 @@ export const DEFAULT_SETTINGS: BumpySettings = {
 	apiKey: '',
 	speechInput: 'web-speech',
 	speechOutput: 'web-speech',
+	speechKeys: { openai: '', groq: '', grok: '', gradium: '' },
 	transcriptionModel: 'whisper-1',
 	speechModel: 'tts-1',
 	speechVoice: 'alloy',
@@ -71,6 +77,12 @@ export function normalizeSettings(
 		| undefined,
 ): BumpySettings {
 	const source = partial ?? {};
+	const speech = normalizeSpeechSetup(
+		source.speechInput,
+		source.speechOutput,
+		source.speechKeys,
+		legacySpeechAccount(source),
+	);
 	const baseUrl = textSetting(source.baseUrl, DEFAULT_SETTINGS.baseUrl);
 	const preset =
 		typeof source.preset === 'string' && isProviderPreset(source.preset)
@@ -81,8 +93,9 @@ export function normalizeSettings(
 		baseUrl,
 		model: textSetting(source.model, ''),
 		apiKey: textSetting(source.apiKey, ''),
-		speechInput: speechRoute(source.speechInput, 'web-speech'),
-		speechOutput: speechRoute(source.speechOutput, 'web-speech'),
+		speechInput: speech.speechInput,
+		speechOutput: speech.speechOutput,
+		speechKeys: speech.speechKeys,
 		transcriptionModel: textSetting(
 			source.transcriptionModel,
 			DEFAULT_SETTINGS.transcriptionModel,
@@ -132,8 +145,28 @@ function hourSetting(value: unknown): number {
 	return number;
 }
 
-function speechRoute(value: unknown, fallback: SpeechRoute): SpeechRoute {
-	return value === 'web-speech' || value === 'openai-audio' ? value : fallback;
+function legacySpeechAccount(source: {
+	preset?: unknown;
+	apiKey?: unknown;
+	features?: unknown;
+}): { preset: string; apiKey: string } {
+	const features =
+		source.features && typeof source.features === 'object'
+			? (source.features as { speech?: unknown }).speech
+			: undefined;
+	const speech =
+		features && typeof features === 'object'
+			? (features as { source?: unknown; apiKey?: unknown })
+			: undefined;
+	const featureKey = typeof speech?.apiKey === 'string' ? speech.apiKey : '';
+	const featurePreset = typeof speech?.source === 'string' ? speech.source : '';
+	if (featurePreset !== '' && featurePreset !== 'shared') {
+		return { preset: featurePreset, apiKey: featureKey };
+	}
+	return {
+		preset: typeof source.preset === 'string' ? source.preset : '',
+		apiKey: typeof source.apiKey === 'string' ? source.apiKey : '',
+	};
 }
 
 function textSetting(value: unknown, fallback: string): string {

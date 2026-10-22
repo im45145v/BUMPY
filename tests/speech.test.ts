@@ -207,6 +207,7 @@ describe('speech settings', () => {
 		});
 		expect(settings.speechInput).toBe('web-speech');
 		expect(settings.speechOutput).toBe('web-speech');
+		expect(settings.speechKeys.openai).toBe('');
 		expect(settings.transcriptionModel).toBe('whisper-1');
 	});
 });

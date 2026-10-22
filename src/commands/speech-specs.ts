@@ -7,7 +7,7 @@ export const SPEECH_COMMANDS = [
 export const APP_SPEECH_LABEL = 'App speech service';
 
 export const SPEECH_INPUT_DESC =
-	'App speech service uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. It does not use the provider URL. Provider audio API records audio and sends it to the speech provider, or to the default provider when Speech is Same as default.';
+	'App speech service uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. OpenAI, Groq, Grok, and Gradium send the recording to that provider.';
 
 export const SPEECH_OUTPUT_DESC =
-	'App speech service uses the speech synthesis built into the app. Provider audio API sends the text to the speech provider and plays the audio it returns.';
+	'App speech service uses the speech synthesis built into the app. OpenAI, Grok, and Gradium speak the text and play the audio they return.';

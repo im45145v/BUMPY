@@ -22,7 +22,7 @@ These commands are available from the command palette:
 
 ## Provider
 
-The provider at the top of **Settings → Bumpy** is the default. Cleanup, vault answers, research, speech, and embeddings can each keep that default or use a provider of their own. A writing model, a speech service, and an embedding model do not have to be the same service.
+The provider at the top of **Settings → Bumpy** is the default. Cleanup, vault answers, research, and embeddings can each keep that default or use a provider of their own. Speech to text and text to speech choose their own provider in the Speech section.
 
 | Provider | Usual URL |
 |---|---|
@@ -43,11 +43,11 @@ OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, and xAI use the 
 In **Settings → Bumpy**:
 
 - **Provider**, **Provider URL**, **Model**, and **API key** are the default used by every feature set to **Same as default**.
-- **Feature providers** gives Cleanup, Vault answers, Research, Speech, or Embeddings its own URL, model, and key. A feature uses its own key and does not reuse the default key.
+- **Feature providers** gives Cleanup, Vault answers, Research, or Embeddings its own URL, model, and key. A feature uses its own key and does not reuse the default key.
 - **API key** is optional for a local server. Cloud providers need their own keys. Keys are stored in this vault’s plugin data on this device and are not written into notes. OpenAI-compatible providers receive the key as a bearer token. Backboard receives it as `X-API-Key`.
 - **Check connection** asks the default provider for its model list. **Check** on a feature does the same for that feature’s provider. The key is sent only in the request header.
 
-Backboard does not store the note in Backboard memory, and it does not provide audio or embeddings. Point **Speech** and **Embeddings** at another provider, or leave speech on **App speech service** and embeddings on **Local hashing**. Note text is sent to the provider for that feature when you run cleanup, ask, or research.
+Backboard does not store the note in Backboard memory, and it does not provide embeddings. Leave embeddings on **Local hashing**, or point **Embeddings** at a provider with an embeddings API. Note text is sent to the provider for that feature when you run cleanup, ask, or research.
 
 Provider errors are redacted so they do not echo note text or an API key. Cancelling stops Bumpy from using the response. Obsidian’s request API cannot abort the underlying socket, so a cancelled request may still finish at the server.
 
@@ -59,9 +59,11 @@ An instruction file is skipped when it is empty, contains a null character, or i
 
 ## Speech
 
-**Speech to text** and **Text to speech** default to **App speech service**. Speech to text uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. It does not use the provider URL. Text to speech uses the app's speech synthesis.
+**Speech to text** and **Text to speech** default to **App speech service**. Speech to text uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. Text to speech uses the app's speech synthesis.
 
-**Provider audio API** sends audio to the speech provider’s `/audio/transcriptions` route and text to its `/audio/speech` route. When **Speech** is **Same as default**, that is the default provider URL. The API key for that provider is sent as a header. Set the transcription model, speech model, and voice for that route. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up. Cleaning a transcript uses the cleanup provider.
+The other choices are **OpenAI**, **Groq** (speech to text), **Grok**, and **Gradium**. Each uses its own API key, stored in plugin data on this device and not written into notes. OpenAI and Groq receive the key as a bearer token. Grok uses a bearer token on its voice API. Gradium uses `x-api-key`. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up. Cleaning a transcript uses the cleanup provider.
+
+Gradium speech to text needs an Ogg recording. When this app can only record WebM, choose OpenAI, Groq, or Grok for dictation. Gradium can still read notes aloud. Grok speaks with the `eve` voice unless you set another Grok voice id.
 
 ## Links, tasks, and calendar
 
