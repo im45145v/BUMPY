@@ -46,6 +46,9 @@ export interface BumpySettings {
 	journalFolder: string;
 	journalDays: number;
 	features: Record<FeatureId, FeatureProvider>;
+	callBridge: boolean;
+	callBridgeUrl: string;
+	callBridgeToken: string;
 }
 
 export const DEFAULT_SETTINGS: BumpySettings = {
@@ -74,6 +77,9 @@ export const DEFAULT_SETTINGS: BumpySettings = {
 	journalFolder: 'Journal',
 	journalDays: 7,
 	features: defaultFeatures(),
+	callBridge: false,
+	callBridgeUrl: '',
+	callBridgeToken: '',
 };
 
 export function normalizeSettings(
@@ -126,6 +132,9 @@ export function normalizeSettings(
 		journalFolder: textSetting(source.journalFolder, DEFAULT_SETTINGS.journalFolder),
 		journalDays: daySetting(source.journalDays),
 		features: normalizeFeatures(source.features),
+		callBridge: source.callBridge === true,
+		callBridgeUrl: textSetting(source.callBridgeUrl, ''),
+		callBridgeToken: textSetting(source.callBridgeToken, ''),
 	};
 }
 

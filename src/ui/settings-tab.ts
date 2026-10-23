@@ -27,6 +27,7 @@ import { featureProviderRows } from './feature-providers';
 import { knowledgeRows, renderKnowledgeSettings } from './knowledge-settings';
 import { closeSettings, openSetup } from './setup-view';
 import { renderSpeechSettings, speechRows } from './speech-settings';
+import { renderCallSettings, callRows } from './call-settings';
 import { renderTaskSettings, taskRows } from './task-settings';
 
 export class BumpySettingTab extends PluginSettingTab {
@@ -88,6 +89,7 @@ export class BumpySettingTab extends PluginSettingTab {
 			...speechRows(this.owner),
 			...taskRows(this.owner),
 			...knowledgeRows(this.owner),
+			...callRows(this.owner),
 		];
 	}
 
@@ -147,6 +149,7 @@ export class BumpySettingTab extends PluginSettingTab {
 		renderSpeechSettings(containerEl, this.owner);
 		renderTaskSettings(containerEl, this.owner);
 		renderKnowledgeSettings(containerEl, this.owner);
+		renderCallSettings(containerEl, this.owner);
 	}
 
 	private addSetup(setting: Setting): void {

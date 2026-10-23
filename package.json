@@ -13,7 +13,8 @@
 		"site": "npm --prefix site run dev",
 		"site:build": "npm --prefix site run build",
 		"agent:worker": "npm --prefix agent run worker",
-		"agent:research": "npm --prefix agent run research"
+		"agent:research": "npm --prefix agent run research",
+		"voice:serve": "cd voice && python3 -m voice_service"
 	},
 	"keywords": [],
 	"license": "0-BSD",

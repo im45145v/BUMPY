@@ -1,11 +1,14 @@
-import { Plugin } from 'obsidian';
+import { Platform, Plugin } from 'obsidian';
+import { obsidianVaultSurface } from './bridge/host';
+import { createBridgePoller } from './bridge/poll';
 import { registerCommands } from './commands';
 import { registerKnowledge } from './commands/knowledge';
 import { registerSetup } from './commands/setup';
 import { registerTaskFeatures } from './commands/tasks';
+import { obsidianHttp } from './providers/obsidian-http';
 import { RequestScope } from './requests/scope';
-import { readFiredReminders } from './tasks/reminders';
 import { normalizeSettings, type BumpySettings } from './settings';
+import { readFiredReminders } from './tasks/reminders';
 import { BumpySettingTab } from './ui/settings-tab';
 
 export default class BumpyPlugin extends Plugin {
@@ -20,6 +23,17 @@ export default class BumpyPlugin extends Plugin {
 		registerCommands(this);
 		registerTaskFeatures(this);
 		registerKnowledge(this);
+		const poll = createBridgePoller(
+			obsidianHttp,
+			() => this.settings,
+			() => obsidianVaultSurface(this),
+		);
+		this.registerInterval(
+			window.setInterval(() => {
+				if (Platform.isMobile) return;
+				void poll();
+			}, 2000),
+		);
 	}
 
 	onunload(): void {

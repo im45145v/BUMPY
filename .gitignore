@@ -9,6 +9,9 @@
 node_modules
 site/dist
 agent/out
+voice/certs/
+__pycache__/
+.pytest_cache/
 
 # Don't include the compiled main.js file in the repo.
 # They should be uploaded to GitHub releases instead.

@@ -15,6 +15,7 @@ export default defineConfig(
 		'tsconfig.json',
 		'site',
 		'agent',
+		'voice',
 	]),
 	{
 		languageOptions: {

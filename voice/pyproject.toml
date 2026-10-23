@@ -1,0 +1,14 @@
+[project]
+name = "bumpy-voice"
+version = "0.1.0"
+description = "LAN voice call for the Arduino UNO Q. The phone calls this process. Obsidian polls it."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+webrtc = ["aiortc>=1.11.0"]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
