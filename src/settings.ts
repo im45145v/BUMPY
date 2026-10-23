@@ -40,7 +40,7 @@ export interface BumpySettings {
 	systemReminders: boolean;
 	embeddings: 'local' | 'provider';
 	embeddingModel: string;
-	searchProvider: 'off' | 'searxng' | 'brave' | 'tavily';
+	searchProvider: 'off' | 'searxng' | 'brave' | 'tavily' | 'serpapi';
 	searchUrl: string;
 	searchApiKey: string;
 	journalFolder: string;
@@ -134,7 +134,11 @@ function languageSetting(value: unknown): string {
 }
 
 function searchSetting(value: unknown): BumpySettings['searchProvider'] {
-	return value === 'searxng' || value === 'brave' || value === 'tavily' || value === 'off'
+	return value === 'searxng' ||
+		value === 'brave' ||
+		value === 'tavily' ||
+		value === 'serpapi' ||
+		value === 'off'
 		? value
 		: 'off';
 }

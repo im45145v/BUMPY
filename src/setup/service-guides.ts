@@ -173,6 +173,33 @@ export const SEARCH_GUIDES: readonly SetupGuide[] = [
 		],
 	},
 	{
+		id: 'serpapi',
+		title: 'SerpAPI',
+		group: 'Search and calendar',
+		summary:
+			'SerpAPI Google results. The key is stored in plugin data and sent as the api_key query parameter. The topic is the query. Research cites only links in the organic results. The request asks SerpAPI for those results only.',
+		steps: [
+			'Create an API key on the [SerpAPI key page](https://serpapi.com/manage-api-key).',
+			'In **Settings → Bumpy**, set **Web search** to **SerpAPI**.',
+			'Paste the key into **Search API key**.',
+			'Run **Research a topic**.',
+		],
+		buttons: [
+			{
+				label: 'Use SerpAPI',
+				detail: 'Sets web search to SerpAPI. Paste the search API key after this.',
+				done: 'Web search is set to SerpAPI.',
+				run: { kind: 'apply', change: { searchProvider: 'serpapi' } },
+			},
+			{
+				label: 'Open key page',
+				detail: 'Opens https://serpapi.com/manage-api-key.',
+				done: 'Opened the SerpAPI key page.',
+				run: { kind: 'open', url: 'https://serpapi.com/manage-api-key' },
+			},
+		],
+	},
+	{
 		id: 'google-calendar',
 		title: 'Google Calendar',
 		group: 'Search and calendar',

@@ -26,6 +26,7 @@ const SEARCH: Array<{ value: BumpySettings['searchProvider']; label: string }> =
 	{ value: 'searxng', label: 'Searxng' },
 	{ value: 'brave', label: 'Brave' },
 	{ value: 'tavily', label: 'Tavily' },
+	{ value: 'serpapi', label: 'SerpAPI' },
 ];
 
 export function renderKnowledgeSettings(
@@ -61,12 +62,12 @@ export function knowledgeRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Search URL',
-			desc: 'Searxng base URL. Brave and Tavily use their own API addresses.',
+			desc: 'Searxng base URL. Brave, Tavily, and SerpAPI use their own API addresses.',
 			render: (setting) => addText(setting, owner, 'searchUrl', 'http://127.0.0.1:8080'),
 		},
 		{
 			name: 'Search API key',
-			desc: "Stored in this vault's plugin data on this device. Brave and Tavily use it. It is not written into notes.",
+			desc: "Stored in this vault's plugin data on this device. Brave, Tavily, and SerpAPI use it. It is not written into notes.",
 			render: (setting) => addSecret(setting, owner),
 		},
 		{
@@ -111,7 +112,13 @@ function addSearch(setting: Setting, owner: SettingsOwner): void {
 	setting.addDropdown((dropdown) => {
 		for (const choice of SEARCH) dropdown.addOption(choice.value, choice.label);
 		dropdown.setValue(owner.settings.searchProvider).onChange(async (value) => {
-			if (value !== 'off' && value !== 'searxng' && value !== 'brave' && value !== 'tavily') {
+			if (
+				value !== 'off' &&
+				value !== 'searxng' &&
+				value !== 'brave' &&
+				value !== 'tavily' &&
+				value !== 'serpapi'
+			) {
 				return;
 			}
 			owner.settings.searchProvider = value;

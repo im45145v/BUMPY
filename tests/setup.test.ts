@@ -36,7 +36,7 @@ describe('setup guides', () => {
 		expect([...presets].sort()).toEqual([...PRESET_IDS].sort());
 		expect([...inputs].sort()).toEqual(SPEECH_INPUTS.map((item) => item.id).sort());
 		expect([...outputs].sort()).toEqual(SPEECH_OUTPUTS.map((item) => item.id).sort());
-		expect([...searches].sort()).toEqual(['brave', 'searxng', 'tavily']);
+		expect([...searches].sort()).toEqual(['brave', 'searxng', 'serpapi', 'tavily']);
 		const ids = SETUP_GUIDES.map((guide) => guide.id);
 		expect(new Set(ids).size).toBe(ids.length);
 	});

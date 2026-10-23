@@ -203,4 +203,64 @@ describe('web search', () => {
 		expect((failed as Error).message).not.toContain('tvly-secret');
 		expect((failed as Error).message).toContain('401');
 	});
+
+	it('asks SerpAPI for organic results and hides the key', async () => {
+		let captured: HttpRequest | undefined;
+		const hits = await searchWeb(
+			async (request) => {
+				captured = request;
+				return {
+					status: 200,
+					body: JSON.stringify({
+						organic_results: [
+							{
+								title: 'Guide',
+								link: 'https://example.com/a',
+								snippet: 'A snippet',
+							},
+							{ title: 'Missing', link: 'not-a-url', snippet: 'No' },
+						],
+					}),
+				};
+			},
+			'serpapi',
+			'',
+			'serp-secret',
+			'tomatoes',
+		);
+		expect(hits).toEqual([
+			{ title: 'Guide', url: 'https://example.com/a', snippet: 'A snippet' },
+		]);
+		const url = new URL(captured?.url ?? '');
+		expect(url.origin + url.pathname).toBe('https://serpapi.com/search.json');
+		expect(url.searchParams.get('engine')).toBe('google');
+		expect(url.searchParams.get('q')).toBe('tomatoes');
+		expect(url.searchParams.get('num')).toBe('5');
+		expect(url.searchParams.get('json_restrictor')).toBe('organic_results');
+		expect(url.searchParams.get('api_key')).toBe('serp-secret');
+		expect(captured?.method).toBe('GET');
+		const failed = await searchWeb(
+			async () => ({
+				status: 401,
+				body: JSON.stringify({ error: 'bad serp-secret' }),
+			}),
+			'serpapi',
+			'',
+			'serp-secret',
+			'tomatoes',
+		).catch((error: unknown) => error);
+		expect((failed as Error).message).not.toContain('serp-secret');
+		expect((failed as Error).message).not.toContain('tomatoes');
+		const reported = await searchWeb(
+			async () => ({
+				status: 200,
+				body: JSON.stringify({ error: 'Your serp-secret is invalid.' }),
+			}),
+			'serpapi',
+			'',
+			'serp-secret',
+			'tomatoes',
+		).catch((error: unknown) => error);
+		expect((reported as Error).message).toBe('The search request failed.');
+	});
 });

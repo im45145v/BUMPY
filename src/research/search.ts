@@ -10,7 +10,7 @@ import { isCitationUrl, type SearchHit } from './note';
 
 export async function searchWeb(
 	http: HttpClient,
-	provider: 'searxng' | 'brave' | 'tavily',
+	provider: 'searxng' | 'brave' | 'tavily' | 'serpapi',
 	url: string,
 	apiKey: string,
 	query: string,
@@ -18,6 +18,7 @@ export async function searchWeb(
 ): Promise<SearchHit[]> {
 	if (provider === 'brave') return searchBrave(http, apiKey, query, signal);
 	if (provider === 'tavily') return searchTavily(http, apiKey, query, signal);
+	if (provider === 'serpapi') return searchSerpapi(http, apiKey, query, signal);
 	if (url.trim() === '') throw new ProviderError('Set a search URL in settings.');
 	return searchSearxng(http, url, query, signal);
 }
@@ -109,11 +110,59 @@ async function searchTavily(
 	return results.flatMap((item) => hitFrom(item, 'content'));
 }
 
-function hitFrom(value: unknown, snippetKey: 'content' | 'description'): SearchHit[] {
+async function searchSerpapi(
+	http: HttpClient,
+	apiKey: string,
+	query: string,
+	signal?: AbortSignal,
+): Promise<SearchHit[]> {
+	const key = apiKey.trim();
+	if (key === '') throw new ProviderError('Set a search API key in settings.');
+	const topic = query.trim();
+	if (topic === '') throw new ProviderError('Enter a topic to research.');
+	if (topic.length > 400) {
+		throw new ProviderError('This topic is too long to search (400 characters).');
+	}
+	const url = new URL('https://serpapi.com/search.json');
+	url.searchParams.set('engine', 'google');
+	url.searchParams.set('q', topic);
+	url.searchParams.set('num', '5');
+	url.searchParams.set('json_restrictor', 'organic_results');
+	url.searchParams.set('api_key', key);
+	const body = await requestJson(http, url.toString(), {}, signal, [key, topic]);
+	const parsed = parseJson(body);
+	if (!parsed || typeof parsed !== 'object') return [];
+	const record = parsed as { organic_results?: unknown; error?: unknown };
+	if (typeof record.error === 'string' && !Array.isArray(record.organic_results)) {
+		throw new ProviderError(searchFailure(record.error, [key, topic]));
+	}
+	if (!Array.isArray(record.organic_results)) return [];
+	return record.organic_results.flatMap((item) => hitFrom(item, 'snippet', 'link'));
+}
+
+function searchFailure(detail: string, secrets: readonly string[]): string {
+	const clean = detail.replace(/\s+/g, ' ').trim().slice(0, 180);
+	if (!clean || revealsSensitiveText(clean, secrets)) return 'The search request failed.';
+	return `The search request failed. ${clean}`;
+}
+
+function hitFrom(
+	value: unknown,
+	snippetKey: 'content' | 'description' | 'snippet',
+	urlKey: 'url' | 'link' = 'url',
+): SearchHit[] {
 	if (!value || typeof value !== 'object') return [];
-	const record = value as { title?: unknown; url?: unknown; content?: unknown; description?: unknown };
+	const record = value as {
+		title?: unknown;
+		url?: unknown;
+		link?: unknown;
+		content?: unknown;
+		description?: unknown;
+		snippet?: unknown;
+	};
 	const title = typeof record.title === 'string' ? record.title.trim() : '';
-	const url = typeof record.url === 'string' ? record.url.trim() : '';
+	const urlValue = record[urlKey];
+	const url = typeof urlValue === 'string' ? urlValue.trim() : '';
 	const snippetValue = record[snippetKey];
 	const snippet = typeof snippetValue === 'string' ? snippetValue.trim() : '';
 	if (!title || !isCitationUrl(url)) return [];

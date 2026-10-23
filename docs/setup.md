@@ -369,6 +369,19 @@ On the setup page:
 - **Use Tavily.** Sets web search to Tavily. Paste the search API key after this.
 - **Open key page.** Opens https://app.tavily.com.
 
+### SerpAPI
+
+SerpAPI Google results. The key is stored in plugin data and sent as the api_key query parameter. The topic is the query. Research cites only links in the organic results. The request asks SerpAPI for those results only.
+
+1. Create an API key on the [SerpAPI key page](https://serpapi.com/manage-api-key).
+2. In **Settings → Bumpy**, set **Web search** to **SerpAPI**.
+3. Paste the key into **Search API key**.
+4. Run **Research a topic**.
+
+On the setup page:
+- **Use SerpAPI.** Sets web search to SerpAPI. Paste the search API key after this.
+- **Open key page.** Opens https://serpapi.com/manage-api-key.
+
 ### Google Calendar
 
 Sync compares dated tasks with a Google calendar. Nothing is synced until a calendar ID and an access token are set. Bumpy does not refresh the token.

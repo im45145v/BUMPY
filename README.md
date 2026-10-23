@@ -111,6 +111,7 @@ Reminders are in-app notices. They are checked when Obsidian loads and about onc
 - **Searxng** uses the **Search URL**, for example `http://127.0.0.1:8080`.
 - **Brave** uses `https://api.search.brave.com` and the **Search API key**. The key is stored in plugin data and sent as a header.
 - **Tavily** uses `https://api.tavily.com/search` and the **Search API key**. The key is stored in plugin data and sent as a bearer token. The topic is sent as the search query. Each search is a basic search.
+- **SerpAPI** uses `https://serpapi.com/search.json` and the **Search API key**. The key is stored in plugin data and sent as the `api_key` query parameter. The topic is the query. Research cites only the organic results, and the request asks for those results only.
 
 The research note cites only URLs returned by that search. A model may add an interpretation, which is labeled as AI-generated. URLs that were not in the search results are removed. If no model is set, the interpretation section says so. An existing note at the same path is left unchanged.
 
@@ -152,6 +153,17 @@ Reload Obsidian, then enable **Bumpy** under **Settings → Community plugins**.
 If the development vault is a Git repository, ignore `.obsidian/plugins/bumpy/data.json` so API keys and the vault index are not committed.
 
 Automated tests cover the note logic and the provider clients with stand-in HTTP. They do not open Obsidian, use a microphone, or call a live model, calendar, or search service.
+
+## Site
+
+The public page lives in `site/`. It is a static site, and the film on it is a Remotion composition that plays in the browser.
+
+```bash
+npm install --prefix site
+npm run site
+```
+
+`render.yaml` publishes that site on Render. Create a Blueprint from this repository. The build runs in `site/`, publishes `dist`, and Render serves the files from its CDN. There is no video file to encode and no server to keep awake.
 
 ## License
 
