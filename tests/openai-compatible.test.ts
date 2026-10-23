@@ -319,4 +319,42 @@ describe('OpenAICompatibleProvider', () => {
 			}),
 		).rejects.toThrow('Could not reach the model provider.');
 	});
+
+	it('sends Ultramarine its recommended request and reads token usage', async () => {
+		let captured: HttpRequest | undefined;
+		const result = await provider(
+			async (request) => {
+				captured = request;
+				return {
+					status: 200,
+					body: JSON.stringify({
+						choices: [{ message: { content: 'A short reading.' } }],
+						usage: {
+							prompt_tokens: 20000,
+							completion_tokens: 1000,
+							prompt_tokens_details: { cached_tokens: 0 },
+						},
+					}),
+				};
+			},
+			'pi_live_test',
+			'https://api.paperinstruments.com/v1',
+		).completeMetered({
+			model: 'ultramarine-1-flash',
+			temperature: 0,
+			messages: [{ role: 'user', content: 'note' }],
+		});
+
+		const raw = captured?.body;
+		if (typeof raw !== 'string') throw new Error('Expected a JSON request body.');
+		const body = JSON.parse(raw) as Record<string, unknown>;
+		expect(body.reasoning_effort).toBe('max');
+		expect(body.max_completion_tokens).toBe(8192);
+		expect(body.temperature).toBeUndefined();
+		expect(captured?.headers.Authorization).toBe('Bearer pi_live_test');
+		expect(result).toEqual({
+			text: 'A short reading.',
+			usage: { inputTokens: 20000, cachedInputTokens: 0, outputTokens: 1000 },
+		});
+	});
 });

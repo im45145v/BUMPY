@@ -73,7 +73,7 @@ export const story: Record<
 	research: {
 		title: "Outside sources stay cited.",
 		paragraphs: [
-			"Web search stays off until you choose SearXNG, Brave, Tavily, or SerpAPI. The research note cites only URLs that search returned. A model may add an interpretation, and that part is labeled AI-generated.",
+			"Web search stays off until you choose SearXNG, Brave, Tavily, or SerpAPI. The research note cites only URLs that search returned. A model may add an interpretation, and that part is labeled AI-generated. When that model is Ultramarine, the note also records what the run cost.",
 			"Daily briefing, Summarize journal, and Trace thoughts are built on this device. Find knowledge gaps points at short sections, questions, and follow-up lines. Nothing here writes a note until you choose Create note.",
 		],
 	},
@@ -81,7 +81,7 @@ export const story: Record<
 		title: "The model can live on this computer.",
 		paragraphs: [
 			"Ollama and LM Studio run here. Local hashing needs no download. SearXNG searches from a server you run. A local server can leave the API key empty.",
-			"OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, xAI, and Backboard are available when you choose them. Each cloud provider needs its own key. Cleanup, vault answers, research, and embeddings can each use a different provider, and a feature uses its own key.",
+			"OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, xAI, Ultramarine, and Backboard are available when you choose them. Each cloud provider needs its own key. Cleanup, vault answers, research, and embeddings can each use a different provider, and a feature uses its own key.",
 		],
 	},
 	close: {
@@ -284,6 +284,12 @@ export const chatProviders = [
 		url: "https://api.x.ai/v1",
 		model: "grok-4",
 		note: "OpenAI chat format.",
+	},
+	{
+		name: "Ultramarine",
+		url: "https://api.paperinstruments.com/v1",
+		model: "ultramarine-1-flash",
+		note: "OpenAI chat format. Research notes record the token cost. It does not provide embeddings.",
 	},
 	{
 		name: "Backboard",

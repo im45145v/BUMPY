@@ -7,6 +7,11 @@ import { createProvider } from '../providers/create-provider';
 import { resolveFeature } from '../providers/features';
 import { obsidianHttp } from '../providers/obsidian-http';
 import { ProviderError } from '../providers/types';
+import {
+	MISSING_USAGE_COST,
+	formatRunCost,
+	isUltramarineEndpoint,
+} from '../providers/ultramarine';
 import { localIsoDate } from '../insights/report';
 import {
 	buildInterpretationMessages,
@@ -89,6 +94,7 @@ export async function researchTopic(plugin: DataHost, topic: string): Promise<vo
 			hits,
 			interpretation: interpretation.text,
 			related,
+			cost: interpretation.cost,
 		});
 		pending.release();
 		previewNewNote(plugin.app, {
@@ -115,24 +121,41 @@ async function interpret(
 	hits: readonly { title: string; url: string; snippet: string }[],
 	instructions: string,
 	signal: AbortSignal,
-): Promise<{ text: string | null; warnings: string[] }> {
+): Promise<{ text: string | null; warnings: string[]; cost: string | null }> {
 	const endpoint = resolveFeature(plugin.settings, 'research');
+	const ultramarine = isUltramarineEndpoint(endpoint.baseUrl);
 	if (endpoint.model.trim() === '') {
 		return {
 			text: null,
 			warnings: ['Set a model in settings to add an interpretation.'],
+			cost: null,
 		};
 	}
-	if (hits.length === 0) return { text: null, warnings: [] };
+	if (hits.length === 0) return { text: null, warnings: [], cost: null };
 	try {
-		const text = await createProvider(endpoint).complete({
+		const provider = createProvider(endpoint);
+		const request = {
 			model: endpoint.model,
 			temperature: 0,
-			messages: buildInterpretationMessages(topic, hits, instructions),
+			messages: buildInterpretationMessages(
+				topic,
+				hits,
+				instructions,
+				ultramarine ? 'ultramarine' : 'default',
+			),
 			signal,
 			redact: hits.map((hit) => hit.snippet),
-		});
-		return { text, warnings: [] };
+		};
+		const metered = provider.completeMetered
+			? await provider.completeMetered(request)
+			: { text: await provider.complete(request), usage: null };
+		const warnings =
+			ultramarine && metered.usage === null ? [MISSING_USAGE_COST] : [];
+		return {
+			text: metered.text,
+			warnings,
+			cost: ultramarine && metered.usage ? formatRunCost(metered.usage) : null,
+		};
 	} catch (error) {
 		if (cancelled(error, signal)) throw error;
 		return {
@@ -142,6 +165,7 @@ async function interpret(
 					? error.message
 					: 'The interpretation request failed.',
 			],
+			cost: null,
 		};
 	}
 }

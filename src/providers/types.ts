@@ -26,8 +26,20 @@ export interface CompletionRequest {
 	redact?: readonly string[];
 }
 
+export interface TokenUsage {
+	inputTokens: number;
+	cachedInputTokens: number;
+	outputTokens: number;
+}
+
+export interface CompletionMeter {
+	text: string;
+	usage: TokenUsage | null;
+}
+
 export interface AIProvider {
 	complete(request: CompletionRequest): Promise<string>;
+	completeMetered?(request: CompletionRequest): Promise<CompletionMeter>;
 }
 
 export interface HttpRequest {

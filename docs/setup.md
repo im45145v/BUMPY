@@ -212,6 +212,23 @@ On the setup page:
 - **Use xAI.** Sets the provider to xAI, fills `https://api.x.ai/v1`, and sets the model to `grok-4`.
 - **Open key page.** Opens https://console.x.ai/.
 
+### Ultramarine
+
+Cleanup, vault answers, and research can use Ultramarine. Note text is sent to Ultramarine when a command uses this provider.
+
+1. Create an API key on the [Ultramarine key page](https://platform.paperinstruments.com/keys).
+2. In **Settings → Bumpy**, select **Ultramarine**. The URL is set to `https://api.paperinstruments.com/v1`. The starting model is `ultramarine-1-flash`.
+3. Paste the key into **API key**.
+4. Select **Check connection**.
+5. Ultramarine does not provide embeddings. Leave embeddings on local hashing, or point Embeddings at a provider with an embeddings API.
+6. Requests use reasoning effort max and omit sampling fields, so Ultramarine uses its recommended defaults. The interpretation prompt is separate from the prompt used for other models.
+7. When Ultramarine reports token usage, the research note states the run cost. Uncached input is $0.15 per million tokens, cached input is $0.03 per million tokens, and output, including reasoning, is $0.50 per million tokens.
+8. A durable run over a folder of notes lives in `agent/`. It calls Ultramarine with the OpenAI SDK inside a Temporal workflow. A failed model call is retried, and a stopped client can resume the same run. The worker writes a draft file and does not change the vault.
+
+On the setup page:
+- **Use Ultramarine.** Sets the provider to Ultramarine, fills `https://api.paperinstruments.com/v1`, and sets the model to `ultramarine-1-flash`.
+- **Open key page.** Opens https://platform.paperinstruments.com/keys.
+
 ### Backboard
 
 Cleanup, vault answers, and research can use Backboard. Note text is sent to Backboard when a command uses this provider.

@@ -43,9 +43,12 @@ The provider at the top of **Settings → Bumpy** is the default. Cleanup, vault
 | Mistral | `https://api.mistral.ai/v1` |
 | DeepSeek | `https://api.deepseek.com/v1` |
 | xAI | `https://api.x.ai/v1` |
+| Ultramarine | `https://api.paperinstruments.com/v1` |
 | Backboard | `https://app.backboard.io/api` |
 
-OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, and xAI use the OpenAI chat format. Backboard uses its own message API. Choosing a provider fills its usual URL and, when a list is known, a starting model from that list. A saved model that is not on the list stays available. Ollama, LM Studio, OpenRouter, and **Custom** keep the model name you type.
+OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, xAI, and Ultramarine use the OpenAI chat format. Backboard uses its own message API. Choosing a provider fills its usual URL and, when a list is known, a starting model from that list. A saved model that is not on the list stays available. Ollama, LM Studio, OpenRouter, and **Custom** keep the model name you type.
+
+Ultramarine calls omit sampling fields and send reasoning effort `max`, which is that model’s recommended default. Its interpretation prompt is separate from the prompt used for other models. When a research response includes token usage, the note states the cost at the published rates: $0.15 per million uncached input tokens, $0.03 per million cached input tokens, and $0.50 per million output tokens, including reasoning. Ultramarine does not provide embeddings.
 
 In **Settings → Bumpy**:
 
@@ -113,7 +116,38 @@ Reminders are in-app notices. They are checked when Obsidian loads and about onc
 - **Tavily** uses `https://api.tavily.com/search` and the **Search API key**. The key is stored in plugin data and sent as a bearer token. The topic is sent as the search query. Each search is a basic search.
 - **SerpAPI** uses `https://serpapi.com/search.json` and the **Search API key**. The key is stored in plugin data and sent as the `api_key` query parameter. The topic is the query. Research cites only the organic results, and the request asks for those results only.
 
-The research note cites only URLs returned by that search. A model may add an interpretation, which is labeled as AI-generated. URLs that were not in the search results are removed. If no model is set, the interpretation section says so. An existing note at the same path is left unchanged.
+The research note cites only URLs returned by that search. A model may add an interpretation, which is labeled as AI-generated. URLs that were not in the search results are removed. If no model is set, the interpretation section says so. An existing note at the same path is left unchanged. When the research provider is Ultramarine and the response includes token usage, the note includes a **Run cost** section.
+
+### Durable research
+
+`agent/` researches a folder of Markdown notes with the OpenAI SDK and Ultramarine, inside a Temporal workflow. The folder read runs once. The model call is retried when the request fails in a way a later attempt can fix. If the client stops, the same workflow id resumes the run. The worker writes a draft file. It does not change a vault.
+
+The key stays in the worker’s environment. It is not an argument to the workflow.
+
+```bash
+npm install --prefix agent
+temporal server start-dev
+```
+
+In a second terminal, from this repository:
+
+```bash
+PAPERINSTRUMENTS_API_KEY=your-key npm run agent:worker
+```
+
+In a third:
+
+```bash
+npm run agent:research -- --dir "/path/to/notes" --topic "What should I follow up?"
+```
+
+The command prints the workflow id immediately. To wait for a run that was already started:
+
+```bash
+npm run agent:research -- --resume bumpy-research-topic-id
+```
+
+`TEMPORAL_ADDRESS` defaults to `localhost:7233`. The draft is written to `agent/out/latest.md` unless `--out` names another file.
 
 ## Briefings
 

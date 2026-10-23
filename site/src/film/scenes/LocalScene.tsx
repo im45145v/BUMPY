@@ -12,6 +12,7 @@ const cloud = [
 	"Mistral",
 	"DeepSeek",
 	"xAI",
+	"Ultramarine",
 	"Backboard",
 ];
 
@@ -55,18 +56,22 @@ export const LocalScene: React.FC = () => {
 					style={{
 						marginTop: "auto",
 						fontFamily: sans,
-						fontSize: 30,
-						lineHeight: 1.45,
+						fontSize: 28,
+						lineHeight: 1.35,
 						opacity: interpolate(frame, [0.9 * fps, 1.3 * fps], [0, 1], {
 							extrapolateLeft: "clamp",
 							extrapolateRight: "clamp",
 						}),
 					}}
 				>
-					<div style={{ fontFamily: mono, fontSize: 24, marginBottom: 12 }}>
+					<div style={{ fontFamily: mono, fontSize: 24, marginBottom: 16 }}>
 						When you choose a cloud provider
 					</div>
-					{cloud.join("  ·  ")}
+					<div style={{ display: "flex", flexWrap: "wrap", gap: "10px 22px" }}>
+						{cloud.map((name) => (
+							<span key={name}>{name}</span>
+						))}
+					</div>
 				</div>
 			</div>
 		</Frame>

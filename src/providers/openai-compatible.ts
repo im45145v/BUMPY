@@ -1,13 +1,16 @@
 import { untilAbort } from './abort';
 import { joinApiPath } from './endpoint';
 import { revealsSensitiveText, secretsFrom } from './redact';
+import { isUltramarineEndpoint } from './ultramarine';
 import {
 	ProviderError,
 	RequestCancelledError,
 	type AIProvider,
+	type CompletionMeter,
 	type CompletionRequest,
 	type HttpClient,
 	type HttpResponse,
+	type TokenUsage,
 } from './types';
 
 const OUTER_ERROR_LIMIT = 180;
@@ -20,6 +23,11 @@ export class OpenAICompatibleProvider implements AIProvider {
 	) {}
 
 	async complete(request: CompletionRequest): Promise<string> {
+		const result = await this.completeMetered(request);
+		return result.text;
+	}
+
+	async completeMetered(request: CompletionRequest): Promise<CompletionMeter> {
 		const url = chatCompletionsUrl(this.baseUrl);
 		const apiKey = this.apiKey.trim();
 		const headers: Record<string, string> = {
@@ -33,11 +41,7 @@ export class OpenAICompatibleProvider implements AIProvider {
 				this.http({
 					url,
 					headers,
-					body: JSON.stringify({
-						model: request.model,
-						temperature: request.temperature,
-						messages: request.messages,
-					}),
+					body: chatRequestBody(this.baseUrl, request),
 					signal: request.signal,
 				}),
 				request.signal,
@@ -56,8 +60,22 @@ export class OpenAICompatibleProvider implements AIProvider {
 			);
 		}
 
-		return readContent(response.body);
+		return { text: readContent(response.body), usage: readUsage(response.body) };
 	}
+}
+
+export function chatRequestBody(baseUrl: string, request: CompletionRequest): string {
+	const body: Record<string, unknown> = {
+		model: request.model,
+		messages: request.messages,
+	};
+	if (isUltramarineEndpoint(baseUrl)) {
+		body.reasoning_effort = 'max';
+		body.max_completion_tokens = 8192;
+	} else {
+		body.temperature = request.temperature;
+	}
+	return JSON.stringify(body);
 }
 
 export function chatCompletionsUrl(baseUrl: string): string {
@@ -123,6 +141,31 @@ function readContent(body: string): string {
 		throw new ProviderError('The model returned an empty response.');
 	}
 	return content;
+}
+
+function readUsage(body: string): TokenUsage | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(body);
+	} catch {
+		return null;
+	}
+	if (!parsed || typeof parsed !== 'object') return null;
+	const usage = (parsed as { usage?: unknown }).usage;
+	if (!usage || typeof usage !== 'object') return null;
+	const record = usage as {
+		prompt_tokens?: unknown;
+		completion_tokens?: unknown;
+		prompt_tokens_details?: { cached_tokens?: unknown };
+	};
+	if (typeof record.prompt_tokens !== 'number') return null;
+	if (typeof record.completion_tokens !== 'number') return null;
+	const cached = record.prompt_tokens_details?.cached_tokens;
+	return {
+		inputTokens: record.prompt_tokens,
+		cachedInputTokens: typeof cached === 'number' ? cached : 0,
+		outputTokens: record.completion_tokens,
+	};
 }
 
 function extractContent(parsed: unknown): string {

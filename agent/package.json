@@ -1,0 +1,22 @@
+{
+	"name": "bumpy-agent",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"worker": "tsx src/worker.ts",
+		"research": "tsx src/run.ts",
+		"typecheck": "tsc -p tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"@temporalio/activity": "^1.15.0",
+		"@temporalio/client": "^1.15.0",
+		"@temporalio/worker": "^1.15.0",
+		"@temporalio/workflow": "^1.15.0",
+		"openai": "^6.8.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.15.17",
+		"tsx": "^4.20.6",
+		"typescript": "^5.8.3"
+	}
+}

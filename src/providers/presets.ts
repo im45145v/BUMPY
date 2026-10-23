@@ -60,6 +60,12 @@ export const PROVIDER_PRESETS = {
 		model: 'grok-4',
 		models: ['grok-4', 'grok-3', 'grok-3-mini'],
 	},
+	ultramarine: {
+		label: 'Ultramarine',
+		baseUrl: 'https://api.paperinstruments.com/v1',
+		model: 'ultramarine-1-flash',
+		models: ['ultramarine-1-flash'],
+	},
 	backboard: {
 		label: 'Backboard',
 		baseUrl: 'https://app.backboard.io/api',

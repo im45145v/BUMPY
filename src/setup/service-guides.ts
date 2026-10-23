@@ -19,6 +19,16 @@ const CLOUD: ReadonlyArray<{
 	{ preset: 'deepseek', keyUrl: 'https://platform.deepseek.com/api_keys' },
 	{ preset: 'xai', keyUrl: 'https://console.x.ai/' },
 	{
+		preset: 'ultramarine',
+		keyUrl: 'https://platform.paperinstruments.com/keys',
+		extra: [
+			'Ultramarine does not provide embeddings. Leave embeddings on local hashing, or point Embeddings at a provider with an embeddings API.',
+			'Requests use reasoning effort max and omit sampling fields, so Ultramarine uses its recommended defaults. The interpretation prompt is separate from the prompt used for other models.',
+			'When Ultramarine reports token usage, the research note states the run cost. Uncached input is $0.15 per million tokens, cached input is $0.03 per million tokens, and output, including reasoning, is $0.50 per million tokens.',
+			'A durable run over a folder of notes lives in `agent/`. It calls Ultramarine with the OpenAI SDK inside a Temporal workflow. A failed model call is retried, and a stopped client can resume the same run. The worker writes a draft file and does not change the vault.',
+		],
+	},
+	{
 		preset: 'backboard',
 		keyUrl: 'https://app.backboard.io',
 		extra: [
