@@ -1,4 +1,5 @@
 import { emptyIndex, readIndex, type VectorIndex } from './index';
+import { updatePluginData } from '../vault/plugin-data';
 
 export async function loadStoredIndex(
 	loadData: () => Promise<unknown>,
@@ -9,10 +10,10 @@ export async function loadStoredIndex(
 }
 
 export async function saveStoredIndex(
-	loadData: () => Promise<unknown>,
-	saveData: (data: unknown) => Promise<void>,
+	host: { loadData(): Promise<unknown>; saveData(data: unknown): Promise<void> },
 	index: VectorIndex,
 ): Promise<void> {
-	const stored = ((await loadData()) ?? {}) as Record<string, unknown>;
-	await saveData({ ...stored, ragIndex: index });
+	await updatePluginData(host, (data) => {
+		data.ragIndex = index;
+	});
 }

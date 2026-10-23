@@ -129,9 +129,9 @@ function addText(
 		text
 			.setPlaceholder(placeholder)
 			.setValue(owner.settings.features[id][key])
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings.features[id][key] = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 	showDetails(owner, id, widget);
@@ -157,9 +157,9 @@ function addFeatureModel(
 		text
 			.setPlaceholder('Model name')
 			.setValue(owner.settings.features[id].model)
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings.features[id].model = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 	syncFeatureModel(owner, id, widget);
@@ -201,9 +201,9 @@ function addSecret(
 		text
 			.setPlaceholder('Optional')
 			.setValue(owner.settings.features[id].apiKey)
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings.features[id].apiKey = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 	showDetails(owner, id, widget);

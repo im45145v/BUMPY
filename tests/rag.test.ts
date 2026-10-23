@@ -121,6 +121,42 @@ describe('vault index', () => {
 		expect(assembled.truncated).toBe(true);
 		expect(assembled.index.chunks).toHaveLength(2000);
 		expect(emptyIndex().embeddings).toBe('local');
+		const overflow = assembleIndex(
+			[],
+			[
+				...Array.from({ length: 2000 }, (_, index) => ({
+					path: 'Full.md',
+					title: 'Full',
+					heading: String(index),
+					text: 'text',
+					vector: [1],
+				})),
+				{
+					path: 'Extra.md',
+					title: 'Extra',
+					heading: 'Extra',
+					text: 'more',
+					vector: [1],
+				},
+			],
+			{ 'Full.md': 'full', 'Extra.md': 'extra' },
+			{ embeddings: 'local', model: '' },
+		);
+		expect(overflow.truncated).toBe(true);
+		expect(overflow.index.files).toEqual({ 'Full.md': 'full' });
+		expect(overflow.index.chunks.every((chunk) => chunk.path === 'Full.md')).toBe(true);
+	});
+
+	it('indexes a leading rule and still skips YAML frontmatter', () => {
+		const ruled = chunkNote('Rule.md', 'Rule', '---\nThe intro stays.\n---\n# Next\nBody');
+		expect(ruled.map((chunk) => chunk.text).join('\n')).toContain('The intro stays.');
+		expect(indexDisabled('---\nThe intro stays.\n---\nbody')).toBe(false);
+		expect(chunkNote('Open.md', 'Open', '---\nhello').some((chunk) => chunk.text.includes('hello'))).toBe(
+			true,
+		);
+		expect(chunkNote('Meta.md', 'Meta', '---\ntitle: Garden\n---\nTomatoes').map((chunk) => chunk.text)).toEqual([
+			'Tomatoes',
+		]);
 	});
 });
 

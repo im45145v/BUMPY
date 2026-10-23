@@ -25,6 +25,7 @@ export interface VaultSurface {
 	read(path: string): Promise<string | null>;
 	write(path: string, text: string): Promise<void>;
 	search(question: string): Promise<string>;
+	showPreview?(preview: CallPreview): void;
 }
 
 const JOB_ID = /^[A-Za-z0-9-]{8,80}$/;
@@ -92,6 +93,7 @@ export async function runVaultJob(
 			if (!path || original === null || proposed === null) return fail('invalid arguments');
 			const current = await surface.read(path);
 			if (current === null) return fail('That note is not available.');
+			if (current === proposed) return ok({ written: true, path, unchanged: true });
 			const decision = decideReplacement(current, original, proposed);
 			if (!decision.ok) return fail(decision.reason);
 			await surface.write(path, decision.next);
@@ -137,9 +139,49 @@ export function listOpenTasks(notes: readonly VaultNote[]): string {
 	return lines.join('\n');
 }
 
+export interface CallPreview {
+	path: string;
+	original: string;
+	proposed: string;
+	warnings: string[];
+}
+
+export function callPreviewFrom(result: unknown): CallPreview | null {
+	if (!result || typeof result !== 'object') return null;
+	const record = result as {
+		path?: unknown;
+		original?: unknown;
+		proposed?: unknown;
+		warnings?: unknown;
+	};
+	if (
+		typeof record.path !== 'string' ||
+		typeof record.original !== 'string' ||
+		typeof record.proposed !== 'string'
+	) {
+		return null;
+	}
+	const warnings = Array.isArray(record.warnings)
+		? record.warnings.filter((item): item is string => typeof item === 'string')
+		: [];
+	return {
+		path: record.path,
+		original: record.original,
+		proposed: record.proposed,
+		warnings,
+	};
+}
+
+/** Spoken summary of a whole-note replacement. Warnings stay in the sentence. */
 export function spokenPreview(warnings: readonly string[]): string {
-	if (warnings.length === 0) return 'The preview is ready. Say apply to write it.';
-	return `The preview is ready. ${warnings[0]} Say apply to write it.`;
+	const lead = 'This replaces the whole note.';
+	if (warnings.length === 0) {
+		return `${lead} Say apply to write it. The preview is open in Obsidian.`;
+	}
+	const heard = warnings.slice(0, 2).join(' ');
+	const extra =
+		warnings.length > 2 ? ` ${warnings.length - 2} more warnings are in Obsidian.` : '';
+	return `${lead} ${heard}${extra} Say apply anyway to write it.`.slice(0, 500);
 }
 
 export function vaultPath(value: unknown): string | null {

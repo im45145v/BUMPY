@@ -16,7 +16,7 @@ export function callRows(owner: SettingsOwner): Array<{
 	return [
 		{
 			name: 'Call bridge',
-			desc: 'When this is on, Obsidian checks the board for vault jobs. The board does not connect to this computer. Leave this off and the vault stays untouched.',
+			desc: 'When this is on, Obsidian polls a local board for vault jobs. The board does not connect in. Jobs travel over HTTPS. Leave this off and the vault stays untouched.',
 			render: (setting) => {
 				setting.addToggle((toggle) => {
 					toggle.setValue(owner.settings.callBridge).onChange(async (value) => {
@@ -28,22 +28,22 @@ export function callRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Board URL',
-			desc: 'A local address for the board, for example http://192.168.1.20:8444. Use https only after this computer trusts the board certificate.',
+			desc: 'The board address, for example https://192.168.1.20:8444. Use localhost or a numeric address on this network. Trust the board certificate on this computer first.',
 			render: (setting) => {
 				setting.addText((text) => {
 					text
 						.setPlaceholder('Local address')
 						.setValue(owner.settings.callBridgeUrl)
-						.onChange(async (value) => {
+						.onChange((value) => {
 							owner.settings.callBridgeUrl = value;
-							await owner.saveSettings();
+							owner.scheduleSave();
 						});
 				});
 			},
 		},
 		{
 			name: 'Call token',
-			desc: 'Shared with the board. Stored in plugin data on this device. It is not written into notes.',
+			desc: 'Shared with the board. Stored in plugin data on this device. It is not written into notes. Note text the call reads is sent to the voice model configured on the board.',
 			render: (setting) => {
 				setting.addText((text) => {
 					text.inputEl.type = 'password';
@@ -51,9 +51,9 @@ export function callRows(owner: SettingsOwner): Array<{
 					text
 						.setPlaceholder('Token')
 						.setValue(owner.settings.callBridgeToken)
-						.onChange(async (value) => {
+						.onChange((value) => {
 							owner.settings.callBridgeToken = value;
-							await owner.saveSettings();
+							owner.scheduleSave();
 						});
 				});
 			},

@@ -14,6 +14,7 @@ class PendingPreview:
     path: str
     original: str
     proposed: str
+    warnings: tuple[str, ...]
 
 
 class Pending:
@@ -26,7 +27,11 @@ class Pending:
         proposed = result.get("proposed")
         if not isinstance(path, str) or not isinstance(original, str) or not isinstance(proposed, str):
             return
-        self.item = PendingPreview(path, original, proposed)
+        warnings = result.get("warnings")
+        if not isinstance(warnings, list):
+            warnings = []
+        clean = tuple(item for item in warnings if isinstance(item, str) and item.strip() != "")
+        self.item = PendingPreview(path, original, proposed, clean)
 
     def clear(self) -> None:
         self.item = None
@@ -41,6 +46,13 @@ class ToolTable:
 
     def has_pending(self) -> bool:
         return self.pending.item is not None
+
+    def needs_extra_confirm(self) -> bool:
+        item = self.pending.item
+        return item is not None and len(item.warnings) > 0
+
+    def files_enabled(self) -> bool:
+        return self.files.root is not None
 
     def drop_pending(self) -> None:
         self.pending.clear()
@@ -84,10 +96,17 @@ class ToolTable:
             self.timeout,
             cancel,
         )
-        self.pending.clear()
         if not outcome.get("ok"):
             error = outcome.get("error")
-            return str(error)[:300] if isinstance(error, str) and error else "The note was not written."
+            message = str(error)[:300] if isinstance(error, str) and error else "The note was not written."
+            if message == "Obsidian is not reachable.":
+                return "I could not confirm the write. Say apply to try again."
+            self.pending.clear()
+            return message
+        self.pending.clear()
+        result = outcome.get("result")
+        if isinstance(result, dict) and result.get("unchanged") is True:
+            return "That note already has that text."
         return "Wrote that into the note."
 
     def _preview(self, arguments: dict[str, Any], cancel: Callable[[], bool]) -> str:
@@ -158,10 +177,24 @@ def note_path(value: Any) -> str:
 
 
 AGREE = re.compile(
-    r"^(?:please\s+)?(?:yes|yeah|yep|ok|okay|apply(?:\s+it)?|write\s+it|do\s+it|go\s+ahead|confirm)[.!]?\s*$",
+    r"^(?:please\s+)?(?:apply(?:\s+it)?|write\s+it|write\s+that)[.!]?\s*$",
+    re.IGNORECASE,
+)
+AGREE_ANYWAY = re.compile(
+    r"^(?:please\s+)?(?:apply\s+anyway|write\s+it\s+anyway)[.!]?\s*$",
     re.IGNORECASE,
 )
 
 
-def agrees(text: str) -> bool:
-    return AGREE.fullmatch(text.strip()) is not None
+def agrees(text: str, warnings: bool = False) -> bool:
+    phrase = text.strip()
+    if AGREE_ANYWAY.fullmatch(phrase) is not None:
+        return True
+    if warnings:
+        return False
+    return AGREE.fullmatch(phrase) is not None
+
+
+def apply_phrase(text: str) -> bool:
+    phrase = text.strip()
+    return AGREE.fullmatch(phrase) is not None or AGREE_ANYWAY.fullmatch(phrase) is not None

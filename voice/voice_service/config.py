@@ -29,7 +29,7 @@ class VoiceConfig:
     local_argv: list[str] = field(default_factory=list)
     whisper_argv: list[str] = field(default_factory=list)
     piper_argv: list[str] = field(default_factory=list)
-    files_root: Path = Path()
+    files_root: Path | None = None
     scripts: dict[str, list[str]] = field(default_factory=dict)
     script_timeout: float = 10.0
     bridge_timeout: float = 20.0
@@ -54,11 +54,17 @@ def load_config(environ: dict[str, str] | None = None) -> VoiceConfig:
         local_argv=json_strings(text(env, "VOICE_LOCAL_ARGV", ""), "VOICE_LOCAL_ARGV"),
         whisper_argv=json_strings(text(env, "VOICE_WHISPER_ARGV", ""), "VOICE_WHISPER_ARGV"),
         piper_argv=json_strings(text(env, "VOICE_PIPER_ARGV", ""), "VOICE_PIPER_ARGV"),
-        files_root=Path(text(env, "VOICE_FILES_ROOT", "")),
+        files_root=folder(text(env, "VOICE_FILES_ROOT", "")),
         scripts=json_scripts(text(env, "VOICE_SCRIPTS", "")),
         script_timeout=number(env, "VOICE_SCRIPT_TIMEOUT", 10.0),
         bridge_timeout=number(env, "VOICE_BRIDGE_TIMEOUT", 20.0),
     )
+
+
+def folder(raw: str) -> Path | None:
+    if raw == "":
+        return None
+    return Path(raw)
 
 
 def text(env: dict[str, str], name: str, default: str) -> str:

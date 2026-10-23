@@ -57,11 +57,11 @@ function addHour(setting: Setting, owner: SettingsOwner): void {
 		text
 			.setPlaceholder('9')
 			.setValue(String(owner.settings.reminderHour))
-			.onChange(async (value) => {
+			.onChange((value) => {
 				const hour = Number(value);
 				if (!Number.isInteger(hour) || hour < 0 || hour > 23) return;
 				owner.settings.reminderHour = hour;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 }
@@ -101,9 +101,9 @@ function addText(
 		text
 			.setPlaceholder(placeholder)
 			.setValue(owner.settings[key])
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings[key] = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 }
@@ -115,9 +115,9 @@ function addSecret(setting: Setting, owner: SettingsOwner): void {
 		text
 			.setPlaceholder('Optional')
 			.setValue(owner.settings.googleAccessToken)
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings.googleAccessToken = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 }

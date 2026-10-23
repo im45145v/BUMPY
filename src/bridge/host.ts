@@ -8,6 +8,7 @@ import { loadStoredIndex } from '../rag/store';
 import type { BumpySettings } from '../settings';
 import { readMarkdownNotes } from '../vault/notes';
 import type { VaultSurface } from './jobs';
+import { openCallPreview } from './preview';
 import { localQueryVector, passagesForQuestion } from './search';
 
 export interface BridgePlugin {
@@ -18,21 +19,26 @@ export interface BridgePlugin {
 
 export function obsidianVaultSurface(plugin: BridgePlugin): VaultSurface {
 	const excluded = () => parseFolders(plugin.settings.excludedFolders);
+	const read = async (path: string) => {
+		if (isExcluded(path, excluded())) return null;
+		const file = plugin.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) return null;
+		return plugin.app.vault.read(file);
+	};
+	const write = async (path: string, text: string) => {
+		if (isExcluded(path, excluded())) throw new Error('That note is not available.');
+		const file = plugin.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) throw new Error('That note is not available.');
+		await plugin.app.vault.modify(file, text);
+	};
 	return {
 		notes: () => readMarkdownNotes(plugin.app, excluded()),
-		read: async (path) => {
-			if (isExcluded(path, excluded())) return null;
-			const file = plugin.app.vault.getAbstractFileByPath(path);
-			if (!(file instanceof TFile)) return null;
-			return plugin.app.vault.read(file);
-		},
-		write: async (path, text) => {
-			if (isExcluded(path, excluded())) throw new Error('That note is not available.');
-			const file = plugin.app.vault.getAbstractFileByPath(path);
-			if (!(file instanceof TFile)) throw new Error('That note is not available.');
-			await plugin.app.vault.modify(file, text);
-		},
+		read,
+		write,
 		search: (question) => searchVault(plugin, question),
+		showPreview: (preview) => {
+			openCallPreview(plugin, preview, write, read);
+		},
 	};
 }
 

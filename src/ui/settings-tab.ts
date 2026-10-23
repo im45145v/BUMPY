@@ -111,9 +111,9 @@ export class BumpySettingTab extends PluginSettingTab {
 				text
 					.setPlaceholder('Base URL')
 					.setValue(this.owner.settings.baseUrl)
-					.onChange(async (value) => {
+					.onChange((value) => {
 						this.owner.settings.baseUrl = value;
-						await this.owner.saveSettings();
+						this.owner.scheduleSave();
 					}),
 			);
 
@@ -132,9 +132,9 @@ export class BumpySettingTab extends PluginSettingTab {
 				text
 					.setPlaceholder('.trash')
 					.setValue(this.owner.settings.excludedFolders)
-					.onChange(async (value) => {
+					.onChange((value) => {
 						this.owner.settings.excludedFolders = value;
-						await this.owner.saveSettings();
+						this.owner.scheduleSave();
 					}),
 			);
 
@@ -192,9 +192,9 @@ export class BumpySettingTab extends PluginSettingTab {
 			field
 				.setPlaceholder('Model name')
 				.setValue(this.owner.settings.model)
-				.onChange(async (value) => {
+				.onChange((value) => {
 					this.owner.settings.model = value;
-					await this.owner.saveSettings();
+					this.owner.scheduleSave();
 				});
 		});
 		this.syncModel = () => {
@@ -225,9 +225,9 @@ export class BumpySettingTab extends PluginSettingTab {
 			text
 				.setPlaceholder('Optional')
 				.setValue(this.owner.settings.apiKey)
-				.onChange(async (value) => {
+				.onChange((value) => {
 					this.owner.settings.apiKey = value;
-					await this.owner.saveSettings();
+					this.owner.scheduleSave();
 				});
 		});
 	}

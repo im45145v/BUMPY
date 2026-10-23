@@ -5,7 +5,9 @@ export interface CleanupPreview {
 	proposed: string;
 	note?: string;
 	warnings?: readonly string[];
-	onApply: () => boolean;
+	onApply: () => boolean | Promise<boolean>;
+	onDismiss?: () => void;
+	title?: string;
 }
 
 export class CleanupPreviewModal extends Modal {
@@ -20,7 +22,7 @@ export class CleanupPreviewModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass('bumpy-preview');
-		this.setTitle('Review cleanup');
+		this.setTitle(this.preview.title ?? 'Review cleanup');
 
 		contentEl.createEl('p', {
 			text:
@@ -55,13 +57,23 @@ export class CleanupPreviewModal extends Modal {
 			.setButtonText(warnings.length > 0 ? 'Apply anyway' : 'Apply')
 			.setCta()
 			.onClick(() => {
-				if (this.preview.onApply()) this.close();
+				apply.setDisabled(true);
+				void Promise.resolve(this.preview.onApply()).then(
+					(ok) => {
+						if (ok) this.close();
+						else apply.setDisabled(false);
+					},
+					() => {
+						apply.setDisabled(false);
+					},
+				);
 			});
 		if (this.preview.proposed.trim() === '') apply.setDisabled(true);
 	}
 
 	onClose(): void {
 		this.contentEl.empty();
+		this.preview.onDismiss?.();
 	}
 }
 

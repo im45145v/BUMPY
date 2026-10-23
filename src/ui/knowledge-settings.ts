@@ -137,9 +137,9 @@ function addText(
 		text
 			.setPlaceholder(placeholder)
 			.setValue(owner.settings[key])
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings[key] = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 }
@@ -151,9 +151,9 @@ function addSecret(setting: Setting, owner: SettingsOwner): void {
 		text
 			.setPlaceholder('Optional')
 			.setValue(owner.settings.searchApiKey)
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings.searchApiKey = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 }
@@ -163,11 +163,11 @@ function addDays(setting: Setting, owner: SettingsOwner): void {
 		text
 			.setPlaceholder('7')
 			.setValue(String(owner.settings.journalDays))
-			.onChange(async (value) => {
+			.onChange((value) => {
 				const days = Number(value);
 				if (!Number.isInteger(days) || days < 1 || days > 365) return;
 				owner.settings.journalDays = days;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 }

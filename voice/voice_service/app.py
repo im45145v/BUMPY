@@ -86,6 +86,9 @@ class App:
             return json_response(200, {"text": self.caption.get()})
         if method == "GET" and path == "/bridge/jobs":
             return json_response(200, {"job": self.bridge.next_job()})
+        if method == "POST" and path == "/bridge/preview/drop":
+            self.conversation.tools.drop_pending()
+            return json_response(200, {"ok": True})
         if method == "POST" and path.startswith("/bridge/jobs/"):
             return self.finish_job(path.removeprefix("/bridge/jobs/"), body)
         return text_response(404, "Not found")

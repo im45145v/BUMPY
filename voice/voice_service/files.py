@@ -12,7 +12,7 @@ class ToolError(Exception):
 class FileSandbox:
     def __init__(
         self,
-        root: Path,
+        root: Path | None,
         scripts: dict[str, list[str]],
         timeout: float = 10.0,
         runner: Callable[..., Any] | None = None,
@@ -93,7 +93,7 @@ class FileSandbox:
         return candidate
 
     def rooted(self) -> Path:
-        if str(self.root) == "" or not self.root.exists():
+        if self.root is None or str(self.root) == "" or not self.root.exists():
             raise ToolError("The file folder is not available.")
         return self.root.resolve()
 

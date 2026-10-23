@@ -84,11 +84,7 @@ async function updateIndex(plugin: DataHost): Promise<void> {
 			vector: vectors[index] ?? [],
 		}));
 		const assembled = assembleIndex(plan.kept, embedded, plan.hashes, mode);
-		await saveStoredIndex(
-			() => plugin.loadData(),
-			(data) => plugin.saveData(data),
-			assembled.index,
-		);
+		await saveStoredIndex(plugin, assembled.index);
 		const count = Object.keys(assembled.index.files).length;
 		new Notice(
 			assembled.truncated

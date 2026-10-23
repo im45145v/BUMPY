@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildMonth, dueReminderKeys, dueTasks, reminderInstant } from '../src/tasks/calendar';
-import { createGoogleEvent, googleEventBody, listGoogleEvents } from '../src/tasks/google';
+import { createGoogleEvent, googleEventBody, listGoogleEvents, updateGoogleEvent } from '../src/tasks/google';
 import {
 	publishDesktopReminder,
 	readFiredReminders,
@@ -280,6 +280,32 @@ describe('calendar sync', () => {
 		expect(urls).toHaveLength(2);
 		expect(urls[1]).toContain('pageToken=page-2');
 		expect(urls[0]).not.toContain('token');
+	});
+
+	it('patches an event instead of replacing it', async () => {
+		let method = '';
+		let body = '';
+		const updated = await updateGoogleEvent(
+			async (request) => {
+				method = request.method ?? '';
+				body = typeof request.body === 'string' ? request.body : '';
+				return {
+					status: 200,
+					body: JSON.stringify({
+						id: 'evt-1',
+						summary: 'Pay rent',
+						start: { date: '2026-10-24' },
+					}),
+				};
+			},
+			'primary',
+			'token',
+			{ id: 'evt-1', title: 'Pay rent', date: '2026-10-24', time: null },
+		);
+		expect(method).toBe('PATCH');
+		expect(body).toContain('Pay rent');
+		expect(body).not.toContain('description');
+		expect(updated.id).toBe('evt-1');
 	});
 
 	it('sends a timed task as a 30-minute event and reads the clock back', () => {

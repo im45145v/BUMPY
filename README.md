@@ -83,6 +83,14 @@ The other choices are **OpenAI**, **Groq** (speech to text), **Grok**, **Gradium
 
 Gradium speech to text accepts Ogg or WAV. When this app records WebM, Bumpy converts it to 24 kHz mono WAV before sending it. Gradium can also read notes aloud.
 
+## Call
+
+The call board is a separate program in `voice/`. Obsidian does not open a call by itself. Turn on **Call bridge** and set a board address such as `https://127.0.0.1:8444`, plus the same token the board was started with. The address has to be localhost or a numeric address on the local network. Trust the board certificate on this computer before the bridge will connect. The board listens with HTTPS on both the call page and the bridge.
+
+Obsidian polls the board. The board does not connect in. A vault question, task list, or note read sends that text to the board, and the board sends it to the voice model configured there. That model may be a cloud service. File and script tools stay off until the board is given a file folder.
+
+A spoken change opens a preview in Obsidian and replaces the whole note only after you apply it there, or say **apply** on the call. If the preview has warnings, say **apply anyway**. Saying yes or ok does not write the note. Closing the preview cancels the spoken write.
+
 ## Links, tasks, and calendar
 
 **Excluded folders** are skipped for links, tasks, the index, and briefings. The default is `.trash`.
@@ -97,11 +105,11 @@ Reminders are in-app notices. They are checked when Obsidian loads and about onc
 
 **Show calendar** lists open tasks that are due today or earlier, then a month grid. Today is outlined. A task with a time shows that time. Select a task to open its note.
 
-**Sync calendar** does nothing until **Google calendar ID** and **Google access token** are set. The token is stored in plugin data and is not written into notes. Bumpy does not refresh the token. A task with a time becomes a 30-minute event in the local time zone. A task with only a date stays an all-day event. Events that Bumpy did not create are left alone. A task that already has a linked event is not given a second event when that event is outside the checked range. When a linked task and its event have both changed, the review lists **Keep the note** and **Use the calendar**. A conflict with no choice is skipped.
+**Sync calendar** does nothing until **Google calendar ID** and **Google access token** are set. The token is stored in plugin data and is not written into notes. Bumpy does not refresh the token. A task with a time becomes a 30-minute event in the local time zone. A task with only a date stays an all-day event. Updating an event changes its title and time and leaves the rest of the event in place. Events that Bumpy did not create are left alone. A task that already has a linked event is not given a second event when that event is outside the checked range. When a linked task and its event have both changed, the review lists **Keep the note** and **Use the calendar**. A conflict with no choice is skipped.
 
 ## Vault questions
 
-**Update vault index** stores passage vectors in plugin data, not in the vault. Notes in excluded folders, notes longer than 200,000 characters, and notes with `bumpy-index: false` in frontmatter are left out. The index keeps up to 2,000 passages and updates a note only when its text or the embedding setting changes. Indexing does not run at startup.
+**Update vault index** stores passage vectors in plugin data, not in the vault. Notes in excluded folders, notes longer than 200,000 characters, and notes with `bumpy-index: false` in frontmatter are left out. The index keeps up to 2,000 passages and updates a note only when its text or the embedding setting changes. A note that does not fit is left out entirely and is tried again the next time you update the index. Indexing does not run at startup. A note that opens with a horizontal rule is still indexed. Only a YAML block between the opening fences is treated as frontmatter.
 
 **Embeddings** defaults to **Local hashing**. That mode stays on device and matches shared words. It is not a neural embedding model. **Provider embeddings** send passages to the embeddings provider’s `/embeddings` route with the embedding model you set. The list includes `nomic-embed-text`, OpenAI’s embedding models, and Mistral’s `mistral-embed`. Choosing Mistral for embeddings selects `mistral-embed`. When **Embeddings** is **Same as default**, that is the default provider URL. Changing the embeddings provider rebuilds passages the next time you update the index.
 

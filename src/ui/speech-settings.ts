@@ -216,11 +216,11 @@ function addKey(
 		text.inputEl.type = 'password';
 		text.inputEl.autocomplete = 'off';
 		const current = provider();
-		text.setPlaceholder(current ? keyLabel(current) : 'Optional').onChange(async (value) => {
+		text.setPlaceholder(current ? keyLabel(current) : 'Optional').onChange((value) => {
 			const chosen = provider();
 			if (!chosen) return;
 			owner.settings.speechKeys[chosen] = value;
-			await owner.saveSettings();
+			owner.scheduleSave();
 		});
 	});
 	return field;
@@ -238,9 +238,9 @@ function addPlain(
 		text
 			.setPlaceholder(placeholder)
 			.setValue(owner.settings[key])
-			.onChange(async (value) => {
+			.onChange((value) => {
 				owner.settings[key] = value;
-				await owner.saveSettings();
+				owner.scheduleSave();
 			});
 	});
 	return field;

@@ -44,12 +44,13 @@ class JobQueue:
         with self._lock:
             if self._pending == []:
                 return None
-            job = self._pending.pop(0)
+            job = self._pending[0]
         return {"id": job.id, "name": job.name, "arguments": job.arguments}
 
     def complete(self, job_id: str, result: dict[str, Any]) -> bool:
         with self._lock:
-            event = self._waiters.get(job_id)
+            event = self._waiters.pop(job_id, None)
+            self._pending = [job for job in self._pending if job.id != job_id]
             if event is None:
                 return False
             self._results[job_id] = result

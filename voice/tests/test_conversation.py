@@ -132,6 +132,38 @@ def test_apply_is_spoken_only_after_agreement() -> None:
     assert ("say", "Wrote that into the note.") in order
 
 
+def test_hangup_forgets_what_was_said() -> None:
+    order: list = []
+    talk, _playback, _gate, _caption = conversation(
+        ['{"say":"Rent is due today."}', '{"say":"Hello."}'],
+        order,
+    )
+    talk.handle("What is due?")
+    talk.drop()
+    talk.handle("hello")
+    models = [item[1] for item in order if item[0] == "model"]
+    assert models[-1][1]["content"] == "hello"
+    assert all("What is due?" not in message["content"] for message in models[-1])
+
+
+def test_warnings_block_a_plain_apply() -> None:
+    tools = ToolTable(JobQueue(), FileSandbox(None, {}), timeout=1)
+    tools.pending.store(
+        {
+            "path": "Home.md",
+            "original": "old",
+            "proposed": "new",
+            "warnings": ["Tasks would be removed."],
+        }
+    )
+    order: list = []
+    talk, _playback, _gate, _caption = conversation(['{"say":"no"}'], order, tools)
+    talk.handle("apply")
+    assert tools.has_pending() is True
+    assert ("say", "That change has warnings. Say apply anyway to write the whole note.") in order
+    assert not any(item[0] == "model" for item in order)
+
+
 def test_greeting_does_not_call_the_model() -> None:
     order: list = []
     talk, playback, _gate, caption = conversation([], order)

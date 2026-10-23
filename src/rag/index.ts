@@ -35,17 +35,14 @@ export function fileHash(text: string): string {
 }
 
 export function indexDisabled(text: string): boolean {
-	if (!text.startsWith('---\n')) return false;
-	const end = text.indexOf('\n---', 4);
-	if (end < 0) return false;
-	return /^\s*bumpy-index:\s*false\s*$/m.test(text.slice(4, end));
+	const matter = frontmatterInner(text);
+	if (matter === null) return false;
+	return /^\s*bumpy-index:\s*false\s*$/m.test(matter);
 }
 
 export function chunkNote(path: string, title: string, text: string): Chunk[] {
 	if (indexDisabled(text)) return [];
-	const body = text.startsWith('---\n')
-		? text.slice(text.indexOf('\n---', 4) + 4).replace(/^\n/, '')
-		: text;
+	const body = noteBody(text);
 	const parts = body.split(/^(?=#{1,6} )/m);
 	const chunks: Chunk[] = [];
 	for (const part of parts) {
@@ -90,15 +87,29 @@ export function assembleIndex(
 	hashes: Record<string, string>,
 	mode: { embeddings: 'local' | 'provider'; model: string },
 ): { index: VectorIndex; truncated: boolean } {
-	const chunks = [...kept, ...embedded].slice(0, MAX_CHUNKS);
+	const all = [...kept, ...embedded];
+	const groups = new Map<string, StoredChunk[]>();
+	for (const chunk of all) {
+		const group = groups.get(chunk.path);
+		if (group) group.push(chunk);
+		else groups.set(chunk.path, [chunk]);
+	}
+	const chunks: StoredChunk[] = [];
+	const files: Record<string, string> = {};
+	for (const [path, group] of groups) {
+		if (chunks.length + group.length > MAX_CHUNKS) continue;
+		chunks.push(...group);
+		const hash = hashes[path];
+		if (typeof hash === 'string') files[path] = hash;
+	}
 	return {
 		index: {
-			files: hashes,
+			files,
 			chunks,
 			embeddings: mode.embeddings,
 			embeddingModel: mode.embeddings === 'provider' ? mode.model : '',
 		},
-		truncated: kept.length + embedded.length > MAX_CHUNKS,
+		truncated: chunks.length < all.length,
 	};
 }
 
@@ -201,4 +212,31 @@ function normalize(vector: number[]): number[] {
 	const norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
 	if (norm === 0) return vector;
 	return vector.map((value) => value / norm);
+}
+
+/** YAML between opening fences. A leading horizontal rule is not frontmatter. */
+function frontmatterInner(text: string): string | null {
+	if (!text.startsWith('---\n')) return null;
+	const end = text.indexOf('\n---', 4);
+	if (end < 0) return null;
+	const inner = text.slice(4, end);
+	let keyed = false;
+	for (const line of inner.split('\n')) {
+		const trimmed = line.trim();
+		if (trimmed === '' || trimmed.startsWith('#')) continue;
+		if (/^[A-Za-z_][A-Za-z0-9_-]*\s*:/.test(line)) {
+			keyed = true;
+			continue;
+		}
+		if (/^\s+\S/.test(line) || /^\s*-\s+/.test(line)) continue;
+		return null;
+	}
+	return keyed ? inner : null;
+}
+
+function noteBody(text: string): string {
+	const inner = frontmatterInner(text);
+	if (inner === null) return text;
+	const end = text.indexOf('\n---', 4);
+	return text.slice(end + 4).replace(/^\n/, '');
 }

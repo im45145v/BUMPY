@@ -70,7 +70,7 @@ export async function updateGoogleEvent(
 		http,
 		url,
 		token,
-		'PUT',
+		'PATCH',
 		JSON.stringify(googleEventBody(event)),
 		signal,
 	);
@@ -149,7 +149,7 @@ async function googleRequest(
 	http: HttpClient,
 	url: string,
 	token: string,
-	method: 'GET' | 'POST' | 'PUT',
+	method: 'GET' | 'POST' | 'PUT' | 'PATCH',
 	body: string | undefined,
 	signal?: AbortSignal,
 ): Promise<string> {

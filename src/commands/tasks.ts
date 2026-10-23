@@ -25,6 +25,7 @@ import { ProviderError } from '../providers/types';
 import { CalendarView, CALENDAR_VIEW } from '../ui/calendar-view';
 import { TaskCaptureModal } from '../ui/task-modal';
 import { readMarkdownNotes } from '../vault/notes';
+import { updatePluginData } from '../vault/plugin-data';
 
 export interface TaskHost extends CleanupHost {
 	firedReminders: Set<string>;
@@ -391,13 +392,15 @@ async function loadLinks(plugin: TaskHost): Promise<SyncLink[]> {
 }
 
 async function saveLinks(plugin: TaskHost, links: SyncLink[]): Promise<void> {
-	const stored = ((await plugin.loadData()) ?? {}) as Record<string, unknown>;
-	await plugin.saveData({ ...stored, calendarLinks: links });
+	await updatePluginData(plugin, (data) => {
+		data.calendarLinks = links;
+	});
 }
 
 async function saveFired(plugin: TaskHost): Promise<void> {
-	const stored = ((await plugin.loadData()) ?? {}) as Record<string, unknown>;
-	await plugin.saveData({ ...stored, firedReminders: [...plugin.firedReminders] });
+	await updatePluginData(plugin, (data) => {
+		data.firedReminders = [...plugin.firedReminders];
+	});
 }
 
 async function writeTaskEvent(

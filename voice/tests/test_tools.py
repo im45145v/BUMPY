@@ -81,6 +81,11 @@ def test_files_stay_in_the_folder_and_scripts_have_no_shell(tmp_path: Path) -> N
         limited.run_script("ping", "")
     with pytest.raises(ToolError, match="not available"):
         FileSandbox(tmp_path / "missing", {}).list_dir(".")
+    closed = FileSandbox(None, {"ping": ["python3", "ping.py"]})
+    with pytest.raises(ToolError, match="not available"):
+        closed.list_dir(".")
+    with pytest.raises(ToolError, match="not available"):
+        closed.run_script("ping", "")
 
 
 def test_apply_waits_for_agreement_and_uses_the_preview() -> None:
@@ -88,6 +93,10 @@ def test_apply_waits_for_agreement_and_uses_the_preview() -> None:
     tools = ToolTable(queue, FileSandbox(Path(), {}), timeout=2)
     assert agrees("apply")
     assert agrees("Please write it.")
+    assert agrees("apply anyway", warnings=True)
+    assert not agrees("yes")
+    assert not agrees("ok")
+    assert not agrees("apply", warnings=True)
     assert not agrees("yes but change the date")
     result: dict[str, object] = {}
 
@@ -119,3 +128,11 @@ def test_model_cannot_apply_and_a_closed_vault_is_unavailable() -> None:
         tools.call("vault.apply", {}, lambda: False)
     assert queue.next_job() is None
     assert tools.call("vault.tasks", {}, lambda: False) == "The vault is unavailable."
+
+
+def test_unconfirmed_apply_keeps_the_preview() -> None:
+    queue = JobQueue()
+    tools = ToolTable(queue, FileSandbox(None, {}), timeout=0.15)
+    tools.pending.store({"path": "Home.md", "original": "old", "proposed": "new"})
+    assert "could not confirm" in tools.apply_pending(lambda: False)
+    assert tools.has_pending() is True

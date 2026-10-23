@@ -44,7 +44,7 @@ export interface AIProvider {
 
 export interface HttpRequest {
 	url: string;
-	method?: 'GET' | 'POST' | 'PUT';
+	method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
 	headers: Record<string, string>;
 	body?: string | ArrayBuffer;
 	contentType?: string;

@@ -1,6 +1,6 @@
 import type { BumpySettings } from '../settings';
 import type { HttpClient } from '../providers/types';
-import { readBridgeJob, runVaultJob, type VaultSurface } from './jobs';
+import { callPreviewFrom, readBridgeJob, runVaultJob, type VaultSurface } from './jobs';
 
 export function bridgeEndpoint(base: string, path: string): string | null {
 	let url: URL;
@@ -46,6 +46,9 @@ export async function pollCallBridge(
 		contentType: 'application/json',
 		body: JSON.stringify(result),
 	});
+	if (job.name !== 'vault.preview' || !result.ok || !surface.showPreview) return;
+	const preview = callPreviewFrom(result.result);
+	if (preview) surface.showPreview(preview);
 }
 
 export function createBridgePoller(
@@ -59,6 +62,8 @@ export function createBridgePoller(
 		busy = true;
 		try {
 			await pollCallBridge(http, settings(), surface());
+		} catch {
+			return;
 		} finally {
 			busy = false;
 		}
@@ -67,7 +72,7 @@ export function createBridgePoller(
 
 function localHost(hostname: string): boolean {
 	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-	if (host === 'localhost' || host === '::1' || host.endsWith('.local')) return true;
+	if (host === 'localhost' || host === '::1') return true;
 	const parts = host.split('.').map((part) => Number(part));
 	if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
 		return false;

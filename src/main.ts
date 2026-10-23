@@ -10,11 +10,13 @@ import { RequestScope } from './requests/scope';
 import { normalizeSettings, type BumpySettings } from './settings';
 import { readFiredReminders } from './tasks/reminders';
 import { BumpySettingTab } from './ui/settings-tab';
+import { updatePluginData } from './vault/plugin-data';
 
 export default class BumpyPlugin extends Plugin {
 	settings!: BumpySettings;
 	readonly requests = new RequestScope();
 	readonly firedReminders = new Set<string>();
+	private saveTimer: number | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -37,7 +39,23 @@ export default class BumpyPlugin extends Plugin {
 	}
 
 	onunload(): void {
+		this.flushSave();
 		this.requests.cancelAll();
+	}
+
+	scheduleSave(): void {
+		if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+		this.saveTimer = window.setTimeout(() => {
+			this.saveTimer = null;
+			void this.saveSettings();
+		}, 400);
+	}
+
+	private flushSave(): void {
+		if (this.saveTimer === null) return;
+		window.clearTimeout(this.saveTimer);
+		this.saveTimer = null;
+		void this.saveSettings();
 	}
 
 	async loadSettings(): Promise<void> {
@@ -48,7 +66,9 @@ export default class BumpyPlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
-		const stored = ((await this.loadData()) ?? {}) as Record<string, unknown>;
-		await this.saveData({ ...stored, ...this.settings });
+		await updatePluginData(this, (data) => {
+			const snapshot = JSON.parse(JSON.stringify(this.settings)) as BumpySettings;
+			Object.assign(data, snapshot);
+		});
 	}
 }

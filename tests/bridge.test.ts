@@ -26,9 +26,10 @@ describe('board address', () => {
 		expect(bridgeEndpoint('http://192.168.1.20:8444/', '/bridge/jobs')).toBe(
 			'http://192.168.1.20:8444/bridge/jobs',
 		);
-		expect(bridgeEndpoint('http://uno.local:8444', '/bridge/jobs')).toBe(
-			'http://uno.local:8444/bridge/jobs',
+		expect(bridgeEndpoint('https://127.0.0.1:8444', '/bridge/jobs')).toBe(
+			'https://127.0.0.1:8444/bridge/jobs',
 		);
+		expect(bridgeEndpoint('http://uno.local:8444', '/bridge/jobs')).toBeNull();
 		expect(bridgeEndpoint('https://example.com', '/bridge/jobs')).toBeNull();
 		expect(bridgeEndpoint('http://user:pass@10.0.0.8:8444', '/bridge/jobs')).toBeNull();
 	});
@@ -85,6 +86,16 @@ describe('vault jobs', () => {
 		expect(applied).toEqual({ ok: true, result: { written: true, path: 'Home.md' } });
 		expect(writes).toEqual(['Home.md']);
 		expect(notes['Home.md']).toBe('new note');
+		const again = await runVaultJob(surface, {
+			id: 'apply0003',
+			name: 'vault.apply',
+			arguments: { path: 'Home.md', original: 'old note', proposed: 'new note' },
+		});
+		expect(again).toEqual({
+			ok: true,
+			result: { written: true, path: 'Home.md', unchanged: true },
+		});
+		expect(writes).toEqual(['Home.md']);
 	});
 
 	it('refuses a path outside the vault and an unknown tool', async () => {
@@ -196,6 +207,24 @@ describe('polling', () => {
 		release();
 		await first;
 		await second;
+	});
+
+	it('stays quiet when the board is down', async () => {
+		const http: HttpClient = async () => {
+			throw new Error('down');
+		};
+		const settings = normalizeSettings({
+			callBridge: true,
+			callBridgeUrl: 'http://127.0.0.1:8444',
+			callBridgeToken: 'token',
+		});
+		const poll = createBridgePoller(
+			http,
+			() => settings,
+			() => unusedSurface(),
+		);
+		await poll();
+		await poll();
 	});
 });
 

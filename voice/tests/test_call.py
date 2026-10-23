@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import ssl
+import subprocess
 import threading
 import time
 import urllib.request
@@ -10,7 +11,7 @@ from pathlib import Path
 from voice_service.app import build_app
 from voice_service.certs import ensure_certificate
 from voice_service.config import ConfigError, VoiceConfig, load_config
-from voice_service.server import Serving, TlsServer, handler_for, start
+from voice_service.server import TlsServer, handler_for, start
 from voice_service.wav import greeting_wav, read_wav
 
 
@@ -87,10 +88,12 @@ def test_plain_bridge_does_not_serve_the_call() -> None:
     assert app.dispatch("GET", "/health", {}, b"", "bridge").status == 200
 
 
-def test_bridge_http_round_trip() -> None:
+def test_bridge_tls_round_trip(tmp_path: Path) -> None:
     app, _peer = make_app()
-    httpd = start(Serving(("127.0.0.1", 0), handler_for("bridge"), app))
+    cert, key = ensure_certificate(tmp_path / "bridge")
+    httpd = start(TlsServer(("127.0.0.1", 0), handler_for("bridge"), app, str(cert), str(key)))
     port = httpd.server_address[1]
+    context = ssl._create_unverified_context()
     found: dict[str, object] = {}
 
     def wait() -> None:
@@ -100,16 +103,35 @@ def test_bridge_http_round_trip() -> None:
     thread.start()
     job = None
     for _ in range(50):
-        job = get_json(port, "/bridge/jobs")
+        job = get_json(port, "/bridge/jobs", context)
         if job.get("job"):
             break
         time.sleep(0.02)
     assert job is not None and job["job"]["name"] == "vault.tasks"
-    post_json(port, f"/bridge/jobs/{job['job']['id']}", {"ok": True, "result": "No open tasks."})
+    post_json(port, f"/bridge/jobs/{job['job']['id']}", {"ok": True, "result": "No open tasks."}, context)
     thread.join(timeout=3)
     assert found["value"]["result"] == "No open tasks."
     httpd.shutdown()
     httpd.server_close()
+
+
+def test_drop_clears_the_preview() -> None:
+    app, _peer = make_app()
+    app.conversation.tools.pending.store({"path": "Home.md", "original": "old", "proposed": "new"})
+    response = app.dispatch("POST", "/bridge/preview/drop", auth(), b"{}", "bridge")
+    assert response.status == 200
+    assert app.conversation.tools.has_pending() is False
+
+
+def test_certificate_names_localhost(tmp_path: Path) -> None:
+    cert, key = ensure_certificate(tmp_path)
+    assert key.stat().st_mode & 0o777 == 0o600
+    text = subprocess.check_output(
+        ["openssl", "x509", "-in", str(cert), "-noout", "-text"],
+        text=True,
+    )
+    assert "localhost" in text
+    assert "127.0.0.1" in text
 
 
 def test_https_page_loads(tmp_path: Path) -> None:
@@ -135,6 +157,10 @@ def test_config_reads_allow_listed_scripts() -> None:
     )
     assert config.scripts["ping"] == ["python3", "ping.py"]
     assert config.local_argv[0] == "llama-server"
+    assert load_config({"VOICE_TOKEN": "t"}).files_root is None
+    assert load_config({"VOICE_TOKEN": "t", "VOICE_FILES_ROOT": "/tmp/bumpy-notes"}).files_root == Path(
+        "/tmp/bumpy-notes"
+    )
     try:
         load_config({"VOICE_SCRIPTS": "[]"})
     except ConfigError as error:
@@ -143,21 +169,21 @@ def test_config_reads_allow_listed_scripts() -> None:
         raise AssertionError("expected a config error")
 
 
-def get_json(port: int, path: str) -> dict:
+def get_json(port: int, path: str, context: ssl.SSLContext) -> dict:
     request = urllib.request.Request(
-        f"http://127.0.0.1:{port}{path}",
+        f"https://127.0.0.1:{port}{path}",
         headers={"Authorization": "Bearer secret-token"},
     )
-    with urllib.request.urlopen(request, timeout=2) as response:
+    with urllib.request.urlopen(request, context=context, timeout=2) as response:
         return json.loads(response.read().decode())
 
 
-def post_json(port: int, path: str, payload: dict) -> None:
+def post_json(port: int, path: str, payload: dict, context: ssl.SSLContext) -> None:
     request = urllib.request.Request(
-        f"http://127.0.0.1:{port}{path}",
+        f"https://127.0.0.1:{port}{path}",
         data=json.dumps(payload).encode(),
         headers={"Authorization": "Bearer secret-token", "Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=2) as response:
+    with urllib.request.urlopen(request, context=context, timeout=2) as response:
         assert response.status == 200

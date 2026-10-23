@@ -204,4 +204,5 @@ export interface SettingsOwner {
 	settings: BumpySettings;
 	saveSettings(): Promise<void>;
 	requests: RequestScope;
+	scheduleSave(): void;
 }
