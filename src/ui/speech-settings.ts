@@ -6,7 +6,9 @@ import {
 import { SPEECH_LANGUAGES, isSpeechLanguage } from '../audio/languages';
 import {
 	SPEECH_INPUTS,
+	SPEECH_MODELS,
 	SPEECH_OUTPUTS,
+	TRANSCRIPTION_MODELS,
 	applySpeechDefaults,
 	isSpeechInput,
 	isSpeechOutput,
@@ -14,6 +16,7 @@ import {
 	speechCloud,
 	type SpeechCloud,
 } from '../audio/speech-catalog';
+import { withCurrentModel } from '../providers/presets';
 import { listSpeechVoices, type SpeechVoice } from '../audio/voices';
 import { obsidianHttp } from '../providers/obsidian-http';
 import { ProviderError } from '../providers/types';
@@ -44,6 +47,8 @@ export function speechRows(owner: SettingsOwner): Array<{
 	let inputKeyRow: HTMLElement | undefined;
 	let outputKeyRow: HTMLElement | undefined;
 	let modelRow: HTMLElement | undefined;
+	let transcriptionMenu: DropdownComponent | undefined;
+	let speechModelMenu: DropdownComponent | undefined;
 	let speechModelRow: HTMLElement | undefined;
 	let voiceRow: HTMLElement | undefined;
 	let voiceMenu: HTMLElement | undefined;
@@ -51,14 +56,27 @@ export function speechRows(owner: SettingsOwner): Array<{
 	const refresh = () => {
 		const input = speechCloud(owner.settings.speechInput);
 		const output = speechCloud(owner.settings.speechOutput);
-		const listed = output === 'grok' || output === 'elevenlabs';
+		const listed = output === 'grok' || output === 'elevenlabs' || output === 'mistral';
 		show(inputKeyRow, input !== null);
-		show(modelRow, input !== null);
+		show(modelRow, input !== null && modelChoices(TRANSCRIPTION_MODELS, input).length > 0);
 		show(outputKeyRow, output !== null && output !== input);
-		show(speechModelRow, output === 'openai' || output === 'elevenlabs');
-		show(voiceRow, output === 'openai' || output === 'grok' || output === 'gradium' || output === 'elevenlabs');
+		show(speechModelRow, output !== null && modelChoices(SPEECH_MODELS, output).length > 0);
+		show(
+			voiceRow,
+			output === 'openai' ||
+				output === 'grok' ||
+				output === 'gradium' ||
+				output === 'elevenlabs' ||
+				output === 'mistral',
+		);
 		show(voiceMenu, listed);
 		show(voiceButton, listed);
+		if (transcriptionMenu && input) {
+			fillModelMenu(transcriptionMenu, modelChoices(TRANSCRIPTION_MODELS, input), owner.settings.transcriptionModel);
+		}
+		if (speechModelMenu && output) {
+			fillModelMenu(speechModelMenu, modelChoices(SPEECH_MODELS, output), owner.settings.speechModel);
+		}
 		if (input) {
 			inputKey?.setPlaceholder(keyLabel(input));
 			inputKey?.setValue(owner.settings.speechKeys[input]);
@@ -98,10 +116,10 @@ export function speechRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Transcription model',
-			desc: 'Model name for speech to text.',
+			desc: 'Model for speech to text. A saved name that is not on the list stays available.',
 			render: (setting) => {
 				modelRow = settingRow(setting);
-				addPlain(setting, owner, 'transcriptionModel', 'whisper-1');
+				transcriptionMenu = addModelMenu(setting, owner, 'transcriptionModel');
 				refresh();
 			},
 		},
@@ -138,16 +156,16 @@ export function speechRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Speech model',
-			desc: 'OpenAI uses tts-1. ElevenLabs uses eleven_v3 for natural reading. eleven_multilingual_v2 does not use the language setting.',
+			desc: 'Model for reading aloud. A saved name that is not on the list stays available. eleven_multilingual_v2 does not use the language setting.',
 			render: (setting) => {
 				speechModelRow = settingRow(setting);
-				addPlain(setting, owner, 'speechModel', 'tts-1');
+				speechModelMenu = addModelMenu(setting, owner, 'speechModel');
 				refresh();
 			},
 		},
 		{
 			name: 'Voice',
-			desc: 'Select List voices for Grok or ElevenLabs. OpenAI uses a name such as alloy. Gradium uses a voice id.',
+			desc: 'Select List voices for Grok, Mistral, or ElevenLabs. OpenAI uses a name such as alloy. Gradium uses a voice id.',
 			render: (setting) => {
 				voiceRow = settingRow(setting);
 				const field = addPlain(setting, owner, 'speechVoice', 'alloy');
@@ -255,7 +273,7 @@ async function loadVoices(
 	field: TextComponent,
 ): Promise<void> {
 	const output = speechCloud(owner.settings.speechOutput);
-	if (output !== 'grok' && output !== 'elevenlabs') return;
+	if (output !== 'grok' && output !== 'elevenlabs' && output !== 'mistral') return;
 	button.setDisabled(true);
 	button.setButtonText('Listing…');
 	try {
@@ -298,6 +316,38 @@ function fillVoiceMenu(
 	for (const voice of options) menu.addOption(voice.id, voice.name);
 	const next = options.some((voice) => voice.id === chosen) ? chosen : options[0]?.id ?? '';
 	menu.setValue(next);
+}
+
+function addModelMenu(
+	setting: Setting,
+	owner: SettingsOwner,
+	key: 'transcriptionModel' | 'speechModel',
+): DropdownComponent {
+	let menu!: DropdownComponent;
+	setting.addDropdown((dropdown) => {
+		menu = dropdown;
+		dropdown.onChange(async (value) => {
+			owner.settings[key] = value;
+			await owner.saveSettings();
+		});
+	});
+	return menu;
+}
+
+function fillModelMenu(menu: DropdownComponent, models: readonly string[], current: string): void {
+	const options = withCurrentModel(models, current);
+	menu.selectEl.replaceChildren();
+	for (const model of options) menu.addOption(model, model);
+	const next = options.includes(current.trim()) ? current.trim() : (options[0] ?? '');
+	if (next !== '') menu.setValue(next);
+}
+
+function modelChoices(
+	lists: Partial<Record<SpeechCloud, readonly string[]>>,
+	route: SpeechCloud | null,
+): readonly string[] {
+	if (!route) return [];
+	return lists[route] ?? [];
 }
 
 function show(row: HTMLElement | undefined, visible: boolean): void {

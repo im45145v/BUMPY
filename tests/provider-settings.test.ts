@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { checkProvider, formatProviderCheck } from '../src/providers/models';
-import { applyPresetSelection, inferPreset } from '../src/providers/presets';
+import {
+	applyPresetSelection,
+	defaultEmbeddingModel,
+	inferPreset,
+	presetModelList,
+	withCurrentModel,
+} from '../src/providers/presets';
 import { chatCompletionsUrl } from '../src/providers/openai-compatible';
 import type { HttpRequest } from '../src/providers/types';
 import { normalizeSettings } from '../src/settings';
@@ -46,7 +52,15 @@ describe('provider settings', () => {
 		expect(settings.model).toBe('llama-3.3-70b-versatile');
 		applyPresetSelection(settings, 'anthropic');
 		expect(settings.baseUrl).toBe('https://api.anthropic.com/v1');
-		expect(settings.model).toBe('');
+		expect(settings.model).toBe('claude-sonnet-4-5');
+		applyPresetSelection(settings, 'mistral');
+		expect(settings.baseUrl).toBe('https://api.mistral.ai/v1');
+		expect(settings.model).toBe('mistral-medium-latest');
+		expect(presetModelList('mistral')).toContain('mistral-small-latest');
+		expect(withCurrentModel(presetModelList('mistral'), 'custom-model')[0]).toBe(
+			'custom-model',
+		);
+		expect(defaultEmbeddingModel('mistral')).toBe('mistral-embed');
 		settings.model = 'llama3.2';
 		applyPresetSelection(settings, 'ollama');
 		expect(settings.baseUrl).toBe('http://127.0.0.1:11434/v1');

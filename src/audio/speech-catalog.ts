@@ -4,6 +4,7 @@ export const SPEECH_INPUTS = [
 	{ id: 'groq', label: 'Groq' },
 	{ id: 'grok', label: 'Grok' },
 	{ id: 'gradium', label: 'Gradium' },
+	{ id: 'mistral', label: 'Mistral' },
 	{ id: 'deepgram', label: 'Deepgram' },
 ] as const;
 
@@ -12,18 +13,27 @@ export const SPEECH_OUTPUTS = [
 	{ id: 'openai', label: 'OpenAI' },
 	{ id: 'grok', label: 'Grok' },
 	{ id: 'gradium', label: 'Gradium' },
+	{ id: 'mistral', label: 'Mistral' },
 	{ id: 'elevenlabs', label: 'ElevenLabs' },
 ] as const;
 
 export type SpeechInput = (typeof SPEECH_INPUTS)[number]['id'];
 export type SpeechOutput = (typeof SPEECH_OUTPUTS)[number]['id'];
-export type SpeechCloud = 'openai' | 'groq' | 'grok' | 'gradium' | 'deepgram' | 'elevenlabs';
+export type SpeechCloud =
+	| 'openai'
+	| 'groq'
+	| 'grok'
+	| 'gradium'
+	| 'mistral'
+	| 'deepgram'
+	| 'elevenlabs';
 
 export interface SpeechKeys {
 	openai: string;
 	groq: string;
 	grok: string;
 	gradium: string;
+	mistral: string;
 	deepgram: string;
 	elevenlabs: string;
 }
@@ -32,7 +42,15 @@ const INPUT_IDS = new Set<string>(SPEECH_INPUTS.map((item) => item.id));
 const OUTPUT_IDS = new Set<string>(SPEECH_OUTPUTS.map((item) => item.id));
 
 export function emptySpeechKeys(): SpeechKeys {
-	return { openai: '', groq: '', grok: '', gradium: '', deepgram: '', elevenlabs: '' };
+	return {
+		openai: '',
+		groq: '',
+		grok: '',
+		gradium: '',
+		mistral: '',
+		deepgram: '',
+		elevenlabs: '',
+	};
 }
 
 export function isSpeechInput(value: string): value is SpeechInput {
@@ -57,12 +75,28 @@ export function keyLabel(provider: SpeechCloud): string {
 			return 'Grok API key';
 		case 'gradium':
 			return 'Gradium API key';
+		case 'mistral':
+			return 'Mistral API key';
 		case 'deepgram':
 			return 'Deepgram API key';
 		case 'elevenlabs':
 			return 'ElevenLabs API key';
 	}
 }
+
+export const TRANSCRIPTION_MODELS: Partial<Record<SpeechCloud, readonly string[]>> = {
+	openai: ['whisper-1'],
+	groq: ['whisper-large-v3-turbo', 'whisper-large-v3'],
+	grok: ['grok-voice-transcribe-2.0'],
+	mistral: ['voxtral-mini-latest'],
+	deepgram: ['nova-3'],
+};
+
+export const SPEECH_MODELS: Partial<Record<SpeechCloud, readonly string[]>> = {
+	openai: ['tts-1', 'tts-1-hd', 'gpt-4o-mini-tts'],
+	mistral: ['voxtral-mini-tts-2603'],
+	elevenlabs: ['eleven_v3', 'eleven_flash_v2_5', 'eleven_turbo_v2_5', 'eleven_multilingual_v2'],
+};
 
 export function applySpeechDefaults(
 	route: SpeechInput | SpeechOutput,
@@ -74,6 +108,7 @@ export function applySpeechDefaults(
 		if (route === 'groq') target.transcriptionModel = 'whisper-large-v3-turbo';
 		if (route === 'grok') target.transcriptionModel = 'grok-voice-transcribe-2.0';
 		if (route === 'deepgram') target.transcriptionModel = 'nova-3';
+		if (route === 'mistral') target.transcriptionModel = 'voxtral-mini-latest';
 		return;
 	}
 	if (route === 'openai') {
@@ -82,6 +117,7 @@ export function applySpeechDefaults(
 	}
 	if (route === 'grok') target.speechVoice = 'eve';
 	if (route === 'gradium') target.speechVoice = 'YTpq7expH9539ERJ';
+	if (route === 'mistral') target.speechModel = 'voxtral-mini-tts-2603';
 	if (route === 'elevenlabs') {
 		target.speechModel = 'eleven_v3';
 		target.speechVoice = 'JBFqnCBsd6RMkjVDRZzb';
@@ -113,20 +149,22 @@ export function normalizeSpeechSetup(
 
 function normalizeInput(value: unknown, legacy: SpeechCloud | null): SpeechInput {
 	if (value === 'openai-audio') {
-		return legacy === 'groq' || legacy === 'grok' || legacy === 'openai' ? legacy : 'openai';
+		return legacy === 'groq' || legacy === 'grok' || legacy === 'openai' || legacy === 'mistral'
+			? legacy
+			: 'openai';
 	}
 	return typeof value === 'string' && isSpeechInput(value) ? value : 'web-speech';
 }
 
 function normalizeOutput(value: unknown, legacy: SpeechCloud | null): SpeechOutput {
 	if (value === 'openai-audio') {
-		return legacy === 'grok' || legacy === 'openai' ? legacy : 'openai';
+		return legacy === 'grok' || legacy === 'openai' || legacy === 'mistral' ? legacy : 'openai';
 	}
 	return typeof value === 'string' && isSpeechOutput(value) ? value : 'web-speech';
 }
 
 function cloudForPreset(preset: string): SpeechCloud | null {
-	if (preset === 'openai' || preset === 'groq') return preset;
+	if (preset === 'openai' || preset === 'groq' || preset === 'mistral') return preset;
 	if (preset === 'xai') return 'grok';
 	return null;
 }

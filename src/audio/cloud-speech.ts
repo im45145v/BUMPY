@@ -9,11 +9,13 @@ import {
 	gradiumRewrite,
 	grokLanguage,
 } from './languages';
+import { synthesizeWithMistral } from './mistral-audio';
 import { synthesizeSpeech, transcribeAudio } from './openai-audio';
 import { speechCloud, type SpeechCloud } from './speech-catalog';
 
 const OPENAI_AUDIO = 'https://api.openai.com/v1';
 const GROQ_AUDIO = 'https://api.groq.com/openai/v1';
+const MISTRAL_AUDIO = 'https://api.mistral.ai/v1';
 
 export interface SpokenAudio {
 	bytes: ArrayBuffer;
@@ -30,12 +32,14 @@ export async function transcribeCloud(
 	const route = speechCloud(settings.speechInput);
 	if (!route) throw new ProviderError('Choose a speech to text provider.');
 	const key = settings.speechKeys[route];
-	if (route === 'openai' || route === 'groq') {
+	if (route === 'openai' || route === 'groq' || route === 'mistral') {
 		return transcribeAudio(http, audio, mime, {
-			baseUrl: route === 'openai' ? OPENAI_AUDIO : GROQ_AUDIO,
+			baseUrl:
+				route === 'openai' ? OPENAI_AUDIO : route === 'groq' ? GROQ_AUDIO : MISTRAL_AUDIO,
 			apiKey: key,
 			model: settings.transcriptionModel,
 			signal,
+			keyHeader: route === 'mistral' ? 'x-api-key' : 'authorization',
 		});
 	}
 	if (route === 'grok') {
@@ -93,6 +97,19 @@ export async function synthesizeCloud(
 				key,
 				signal,
 				grokLanguage(settings.speechLanguage),
+			),
+		};
+	}
+	if (route === 'mistral') {
+		return {
+			mime: 'audio/mpeg',
+			bytes: await synthesizeWithMistral(
+				http,
+				text,
+				settings.speechVoice,
+				settings.speechModel,
+				key,
+				signal,
 			),
 		};
 	}

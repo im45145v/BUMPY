@@ -1,4 +1,12 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {
+	App,
+	DropdownComponent,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	TextComponent,
+} from 'obsidian';
 import { checkBackboard } from '../providers/backboard';
 import { checkProvider, formatProviderCheck } from '../providers/models';
 import { obsidianHttp } from '../providers/obsidian-http';
@@ -7,7 +15,9 @@ import {
 	PROVIDER_PRESETS,
 	applyPresetSelection,
 	isProviderPreset,
+	presetModelList,
 	usesBackboard,
+	withCurrentModel,
 } from '../providers/presets';
 import {
 	type BumpySettings,
@@ -46,12 +56,8 @@ export class BumpySettingTab extends PluginSettingTab {
 			},
 			{
 				name: 'Model',
-				desc: 'Name expected by the provider.',
-				control: {
-					type: 'text',
-					key: 'model',
-					placeholder: 'Model name',
-				},
+				desc: MODEL_DESC,
+				render: (setting) => this.addModel(setting),
 			},
 			{
 				name: 'API key',
@@ -101,18 +107,7 @@ export class BumpySettingTab extends PluginSettingTab {
 					}),
 			);
 
-		new Setting(containerEl)
-			.setName('Model')
-			.setDesc('Name expected by the provider.')
-			.addText((text) =>
-				text
-					.setPlaceholder('Model name')
-					.setValue(this.owner.settings.model)
-					.onChange(async (value) => {
-						this.owner.settings.model = value;
-						await this.owner.saveSettings();
-					}),
-			);
+		this.addModel(new Setting(containerEl).setName('Model').setDesc(MODEL_DESC));
 
 		this.addApiKey(
 			new Setting(containerEl).setName('API key').setDesc(API_KEY_DESC),
@@ -155,9 +150,53 @@ export class BumpySettingTab extends PluginSettingTab {
 				if (!isProviderPreset(value)) return;
 				applyPresetSelection(this.owner.settings, value);
 				await this.owner.saveSettings();
+				this.syncModel();
 				this.display();
 			});
 		});
+	}
+
+	private syncModel: () => void = () => {};
+
+	private addModel(setting: Setting): void {
+		let text: TextComponent | undefined;
+		let menu: DropdownComponent | undefined;
+		setting.addDropdown((dropdown) => {
+			menu = dropdown;
+			dropdown.onChange(async (value) => {
+				this.owner.settings.model = value;
+				await this.owner.saveSettings();
+			});
+		});
+		setting.addText((field) => {
+			text = field;
+			field
+				.setPlaceholder('Model name')
+				.setValue(this.owner.settings.model)
+				.onChange(async (value) => {
+					this.owner.settings.model = value;
+					await this.owner.saveSettings();
+				});
+		});
+		this.syncModel = () => {
+			const models = withCurrentModel(
+				presetModelList(this.owner.settings.preset),
+				this.owner.settings.model,
+			);
+			if (!menu || !text) return;
+			const listed = models.length > 0;
+			showControl(menu.selectEl, listed);
+			showControl(text.inputEl, !listed);
+			if (!listed) {
+				text.setValue(this.owner.settings.model);
+				return;
+			}
+			menu.selectEl.replaceChildren();
+			for (const model of models) menu.addOption(model, model);
+			const current = this.owner.settings.model.trim();
+			menu.setValue(models.includes(current) ? current : (models[0] ?? ''));
+		};
+		this.syncModel();
 	}
 
 	private addApiKey(setting: Setting): void {
@@ -206,6 +245,13 @@ export class BumpySettingTab extends PluginSettingTab {
 		}
 	}
 }
+
+function showControl(element: HTMLElement, visible: boolean): void {
+	element.style.display = visible ? '' : 'none';
+}
+
+const MODEL_DESC =
+	'Choose a model from the provider list. A saved name that is not on the list stays available. Ollama, LM Studio, OpenRouter, and Custom keep the name you type.';
 
 const PROVIDER_DESC =
 	'Choosing a provider fills its usual URL and, when one is known, a starting model. Choose Custom to keep the URL as you typed it. Each feature below can use a different provider.';

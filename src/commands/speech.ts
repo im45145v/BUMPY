@@ -12,12 +12,12 @@ import {
 import { synthesizeCloud, transcribeCloud } from '../audio/cloud-speech';
 import { browserDeepgramInput } from '../audio/deepgram-audio';
 import { GRADIUM_RECORDING_TYPES } from '../audio/gradium-audio';
+import { audioForGradium, decodeRecording } from '../audio/pcm-wav';
 import { deepgramLanguage, webSpeechLanguage } from '../audio/languages';
 import { playAudioBytes } from '../audio/playback';
 import { readAloud } from '../audio/speak';
 import { selectionRange, type CleanupEditor } from '../notes/editor-apply';
 import { obsidianHttp } from '../providers/obsidian-http';
-import { ProviderError } from '../providers/types';
 import { cancelOnClick } from '../requests/dismiss';
 import { DictateModal } from '../ui/dictate-modal';
 import type { CleanupHost } from './cleanup';
@@ -134,20 +134,22 @@ function speechInput(host: CleanupHost): SpeechInputEngine {
 			deepgramLanguage(host.settings.speechLanguage),
 		);
 	}
-	const mime = host.settings.speechInput === 'gradium' ? gradiumRecordingMime() : '';
-	if (host.settings.speechInput === 'gradium' && mime === '') {
-		return {
-			isSupported: () => true,
-			listen: () =>
-				Promise.reject(
-					new ProviderError(
-						'Gradium cannot transcribe the recording format from this app. Choose OpenAI, Groq, Grok, or Deepgram for speech to text.',
-					),
-				),
-		};
-	}
-	return createRecorderInput(new BrowserAudioRecorder(mime), (audio, recordedMime, requestSignal) =>
-		transcribeCloud(host.settings, audio, recordedMime, requestSignal, obsidianHttp),
+	const gradium = host.settings.speechInput === 'gradium';
+	const mime = gradium ? gradiumRecordingMime() : '';
+	return createRecorderInput(
+		new BrowserAudioRecorder(mime),
+		async (audio, recordedMime, requestSignal) => {
+			const prepared = gradium
+				? await audioForGradium(audio, recordedMime, decodeRecording)
+				: { bytes: audio, mime: recordedMime };
+			return transcribeCloud(
+				host.settings,
+				prepared.bytes,
+				prepared.mime,
+				requestSignal,
+				obsidianHttp,
+			);
+		},
 	);
 }
 

@@ -14,6 +14,7 @@ export interface AudioEndpoint {
 	apiKey: string;
 	model: string;
 	signal?: AbortSignal;
+	keyHeader?: 'authorization' | 'x-api-key';
 }
 
 export async function transcribeAudio(
@@ -130,7 +131,8 @@ async function postAudio(
 ): Promise<string> {
 	const key = endpoint.apiKey.trim();
 	const headers: Record<string, string> = {};
-	if (key) headers.Authorization = `Bearer ${key}`;
+	if (key && endpoint.keyHeader === 'x-api-key') headers['x-api-key'] = key;
+	else if (key) headers.Authorization = `Bearer ${key}`;
 	let response;
 	try {
 		response = await untilAbort(

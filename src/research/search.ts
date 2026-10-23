@@ -10,13 +10,14 @@ import { isCitationUrl, type SearchHit } from './note';
 
 export async function searchWeb(
 	http: HttpClient,
-	provider: 'searxng' | 'brave',
+	provider: 'searxng' | 'brave' | 'tavily',
 	url: string,
 	apiKey: string,
 	query: string,
 	signal?: AbortSignal,
 ): Promise<SearchHit[]> {
 	if (provider === 'brave') return searchBrave(http, apiKey, query, signal);
+	if (provider === 'tavily') return searchTavily(http, apiKey, query, signal);
 	if (url.trim() === '') throw new ProviderError('Set a search URL in settings.');
 	return searchSearxng(http, url, query, signal);
 }
@@ -37,7 +38,7 @@ async function searchSearxng(
 	query: string,
 	signal?: AbortSignal,
 ): Promise<SearchHit[]> {
-	const body = await getJson(http, searchUrl(baseUrl, query), {}, signal, [query]);
+	const body = await requestJson(http, searchUrl(baseUrl, query), {}, signal, [query]);
 	const parsed = parseJson(body);
 	const results =
 		parsed && typeof parsed === 'object'
@@ -57,7 +58,7 @@ async function searchBrave(
 	if (key === '') throw new ProviderError('Set a search API key in settings.');
 	const url = new URL('https://api.search.brave.com/res/v1/web/search');
 	url.searchParams.set('q', query);
-	const body = await getJson(
+	const body = await requestJson(
 		http,
 		url.toString(),
 		{ 'X-Subscription-Token': key },
@@ -74,6 +75,40 @@ async function searchBrave(
 	return results.flatMap((item) => hitFrom(item, 'description'));
 }
 
+async function searchTavily(
+	http: HttpClient,
+	apiKey: string,
+	query: string,
+	signal?: AbortSignal,
+): Promise<SearchHit[]> {
+	const key = apiKey.trim();
+	if (key === '') throw new ProviderError('Set a search API key in settings.');
+	const topic = query.trim();
+	if (topic === '') throw new ProviderError('Enter a topic to research.');
+	if (topic.length > 400) {
+		throw new ProviderError('This topic is too long to search (400 characters).');
+	}
+	const body = await requestJson(
+		http,
+		'https://api.tavily.com/search',
+		{ Authorization: `Bearer ${key}` },
+		signal,
+		[key, topic],
+		JSON.stringify({
+			query: topic,
+			search_depth: 'basic',
+			max_results: 5,
+		}),
+	);
+	const parsed = parseJson(body);
+	const results =
+		parsed && typeof parsed === 'object'
+			? (parsed as { results?: unknown }).results
+			: undefined;
+	if (!Array.isArray(results)) return [];
+	return results.flatMap((item) => hitFrom(item, 'content'));
+}
+
 function hitFrom(value: unknown, snippetKey: 'content' | 'description'): SearchHit[] {
 	if (!value || typeof value !== 'object') return [];
 	const record = value as { title?: unknown; url?: unknown; content?: unknown; description?: unknown };
@@ -85,16 +120,27 @@ function hitFrom(value: unknown, snippetKey: 'content' | 'description'): SearchH
 	return [{ title, url, snippet }];
 }
 
-async function getJson(
+async function requestJson(
 	http: HttpClient,
 	url: string,
 	headers: Record<string, string>,
 	signal: AbortSignal | undefined,
 	secrets: readonly string[],
+	body?: string,
 ): Promise<string> {
 	let response;
 	try {
-		response = await untilAbort(http({ url, method: 'GET', headers, signal }), signal);
+		response = await untilAbort(
+			http({
+				url,
+				method: body === undefined ? 'GET' : 'POST',
+				headers,
+				body,
+				contentType: body === undefined ? undefined : 'application/json',
+				signal,
+			}),
+			signal,
+		);
 	} catch (error) {
 		if (signal?.aborted || error instanceof RequestCancelledError) {
 			throw new RequestCancelledError();
@@ -113,11 +159,10 @@ function failure(status: number, body: string, secrets: readonly string[]): stri
 	try {
 		const parsed: unknown = JSON.parse(body);
 		if (parsed && typeof parsed === 'object') {
-			const message = (parsed as { message?: unknown; error?: unknown }).message;
-			if (typeof message === 'string') detail = message;
-			else if (typeof (parsed as { error?: unknown }).error === 'string') {
-				detail = (parsed as { error: string }).error;
-			}
+			const record = parsed as { message?: unknown; error?: unknown; detail?: unknown };
+			if (typeof record.message === 'string') detail = record.message;
+			else if (typeof record.error === 'string') detail = record.error;
+			else if (typeof record.detail === 'string') detail = record.detail;
 		}
 	} catch {
 		detail = '';

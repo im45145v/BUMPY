@@ -10,20 +10,26 @@ export const PROVIDER_PRESETS = {
 	openai: {
 		label: 'OpenAI',
 		baseUrl: 'https://api.openai.com/v1',
+		model: 'gpt-4o',
+		models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'],
 	},
 	anthropic: {
 		label: 'Anthropic',
 		baseUrl: 'https://api.anthropic.com/v1',
+		model: 'claude-sonnet-4-5',
+		models: ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5'],
 	},
 	gemini: {
 		label: 'Gemini',
 		baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
 		model: 'gemini-3.8-flash',
+		models: ['gemini-3.8-flash'],
 	},
 	groq: {
 		label: 'Groq',
 		baseUrl: 'https://api.groq.com/openai/v1',
 		model: 'llama-3.3-70b-versatile',
+		models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
 	},
 	openrouter: {
 		label: 'OpenRouter',
@@ -32,19 +38,33 @@ export const PROVIDER_PRESETS = {
 	mistral: {
 		label: 'Mistral',
 		baseUrl: 'https://api.mistral.ai/v1',
+		model: 'mistral-medium-latest',
+		models: [
+			'mistral-medium-latest',
+			'mistral-large-latest',
+			'mistral-small-latest',
+			'codestral-latest',
+			'ministral-14b-latest',
+			'ministral-8b-latest',
+		],
 	},
 	deepseek: {
 		label: 'DeepSeek',
 		baseUrl: 'https://api.deepseek.com/v1',
+		model: 'deepseek-chat',
+		models: ['deepseek-chat', 'deepseek-reasoner'],
 	},
 	xai: {
 		label: 'xAI',
 		baseUrl: 'https://api.x.ai/v1',
+		model: 'grok-4',
+		models: ['grok-4', 'grok-3', 'grok-3-mini'],
 	},
 	backboard: {
 		label: 'Backboard',
 		baseUrl: 'https://app.backboard.io/api',
 		model: 'gpt-4o',
+		models: ['gpt-4o'],
 	},
 	custom: {
 		label: 'Custom',
@@ -59,9 +79,42 @@ export const PRESET_IDS = Object.keys(PROVIDER_PRESETS) as ProviderPreset[];
 const KEEPS_CURRENT_MODEL = new Set<ProviderPreset>([
 	'ollama',
 	'lm-studio',
-	'openai',
+	'openrouter',
 	'custom',
 ]);
+
+export const EMBEDDING_MODEL_CHOICES = [
+	'nomic-embed-text',
+	'text-embedding-3-small',
+	'text-embedding-3-large',
+	'mistral-embed',
+] as const;
+
+export function presetModelList(preset: ProviderPreset): readonly string[] {
+	const chosen = PROVIDER_PRESETS[preset];
+	if ('models' in chosen) return chosen.models;
+	return [];
+}
+
+export function withCurrentModel(models: readonly string[], current: string): string[] {
+	const value = current.trim();
+	if (value !== '' && !models.includes(value)) return [value, ...models];
+	return [...models];
+}
+
+export function defaultEmbeddingModel(preset: ProviderPreset): string {
+	switch (preset) {
+		case 'mistral':
+			return 'mistral-embed';
+		case 'openai':
+			return 'text-embedding-3-small';
+		case 'ollama':
+		case 'lm-studio':
+			return 'nomic-embed-text';
+		default:
+			return '';
+	}
+}
 
 export function isProviderPreset(value: string): value is ProviderPreset {
 	return Object.prototype.hasOwnProperty.call(PROVIDER_PRESETS, value);

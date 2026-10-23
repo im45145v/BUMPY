@@ -38,7 +38,7 @@ The provider at the top of **Settings → Bumpy** is the default. Cleanup, vault
 | xAI | `https://api.x.ai/v1` |
 | Backboard | `https://app.backboard.io/api` |
 
-OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, and xAI use the OpenAI chat format. Backboard uses its own message API. Choosing a provider fills its usual URL. Gemini, Groq, and Backboard also fill a starting model. **Custom** leaves the URL as you typed it. Set the model name the provider expects when no starting model is filled.
+OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, and xAI use the OpenAI chat format. Backboard uses its own message API. Choosing a provider fills its usual URL and, when a list is known, a starting model from that list. A saved model that is not on the list stays available. Ollama, LM Studio, OpenRouter, and **Custom** keep the model name you type.
 
 In **Settings → Bumpy**:
 
@@ -61,15 +61,17 @@ An instruction file is skipped when it is empty, contains a null character, or i
 
 **Speech to text** and **Text to speech** default to **App speech service**. Speech to text uses the recognizer built into the app. On desktop that recognizer can send microphone audio to its own service. Text to speech uses the app's speech synthesis.
 
-The other choices are **OpenAI**, **Groq** (speech to text), **Grok**, **Gradium**, **Deepgram** (speech to text), and **ElevenLabs** (text to speech). Each uses its own API key, stored in plugin data on this device and not written into notes. OpenAI, Groq, Grok, and Deepgram receive the key as a bearer token. Deepgram’s live connection sends the key as a WebSocket protocol, not in the recording URL, and opts out of Deepgram’s model improvement program. Gradium uses `x-api-key`. ElevenLabs uses `xi-api-key`. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up. Cleaning a transcript uses the cleanup provider.
+The other choices are **OpenAI**, **Groq** (speech to text), **Grok**, **Gradium**, **Mistral**, **Deepgram** (speech to text), and **ElevenLabs** (text to speech). Each uses its own API key, stored in plugin data on this device and not written into notes. OpenAI, Groq, Grok, and Deepgram receive the key as a bearer token. Deepgram’s live connection sends the key as a WebSocket protocol, not in the recording URL, and opts out of Deepgram’s model improvement program. Gradium uses `x-api-key`. Mistral speech to text also uses `x-api-key`, and Mistral reading uses a bearer token. ElevenLabs uses `xi-api-key`. Dictation can be cancelled, and the transcript can be edited before it is inserted or cleaned up. Cleaning a transcript uses the cleanup provider.
 
 **Deepgram** is the choice for a noisy recording, or when you want the words to appear while you talk. It streams the microphone audio and shows a live transcript. The other cloud speech-to-text providers wait until you stop, then send the recording.
 
-**ElevenLabs** is the choice for more natural reading. It uses the `eleven_v3` model and the George voice until you choose another. **List voices** asks Grok or ElevenLabs for the voices on that key and lets you pick one. Grok no longer has to stay on `eve`.
+**Mistral** dictation uses `voxtral-mini-latest`. Mistral reading uses `voxtral-mini-tts-2603`. **List voices** loads the voices on that key before a note can be read aloud.
+
+**ElevenLabs** is the choice for more natural reading. It uses the `eleven_v3` model and the George voice until you choose another. **List voices** asks Grok, Mistral, or ElevenLabs for the voices on that key and lets you pick one. Grok no longer has to stay on `eve`.
 
 **Language** replaces automatic detection for Grok and Gradium. Automatic leaves Grok on `auto` and Gradium on `any`. A chosen language is also sent to Deepgram, ElevenLabs models that accept it (`eleven_v3`, Flash v2.5, Turbo v2.5), and the app recognizer. Gradium transcribes English, French, German, Spanish, and Portuguese. `eleven_multilingual_v2` does not take the language setting.
 
-Gradium speech to text needs an Ogg recording. When this app can only record WebM, choose OpenAI, Groq, Grok, or Deepgram for dictation. Gradium can still read notes aloud.
+Gradium speech to text accepts Ogg or WAV. When this app records WebM, Bumpy converts it to 24 kHz mono WAV before sending it. Gradium can also read notes aloud.
 
 ## Links, tasks, and calendar
 
@@ -91,7 +93,7 @@ Reminders are in-app notices. They are checked when Obsidian loads and about onc
 
 **Update vault index** stores passage vectors in plugin data, not in the vault. Notes in excluded folders, notes longer than 200,000 characters, and notes with `bumpy-index: false` in frontmatter are left out. The index keeps up to 2,000 passages and updates a note only when its text or the embedding setting changes. Indexing does not run at startup.
 
-**Embeddings** defaults to **Local hashing**. That mode stays on device and matches shared words. It is not a neural embedding model. **Provider embeddings** send passages to the embeddings provider’s `/embeddings` route with the embedding model you set. When **Embeddings** is **Same as default**, that is the default provider URL. Changing the embeddings provider rebuilds passages the next time you update the index.
+**Embeddings** defaults to **Local hashing**. That mode stays on device and matches shared words. It is not a neural embedding model. **Provider embeddings** send passages to the embeddings provider’s `/embeddings` route with the embedding model you set. The list includes `nomic-embed-text`, OpenAI’s embedding models, and Mistral’s `mistral-embed`. Choosing Mistral for embeddings selects `mistral-embed`. When **Embeddings** is **Same as default**, that is the default provider URL. Changing the embeddings provider rebuilds passages the next time you update the index.
 
 **Ask the vault** retrieves matching passages and, when the vault-answers model is set, asks that model to answer only from those passages. Passages from excluded folders or from notes that are no longer in the vault are skipped, even when an older index still contains them. Passages are treated as untrusted data. The answer lists source notes, and **Open note** jumps to one. **Insert** writes the answer only at the cursor you still have, and only if the note has not changed.
 
@@ -101,6 +103,7 @@ Reminders are in-app notices. They are checked when Obsidian loads and about onc
 
 - **Searxng** uses the **Search URL**, for example `http://127.0.0.1:8080`.
 - **Brave** uses `https://api.search.brave.com` and the **Search API key**. The key is stored in plugin data and sent as a header.
+- **Tavily** uses `https://api.tavily.com/search` and the **Search API key**. The key is stored in plugin data and sent as a bearer token. The topic is sent as the search query. Each search is a basic search.
 
 The research note cites only URLs returned by that search. A model may add an interpretation, which is labeled as AI-generated. URLs that were not in the search results are removed. If no model is set, the interpretation section says so. An existing note at the same path is left unchanged.
 

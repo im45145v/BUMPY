@@ -12,6 +12,7 @@ import {
 	synthesizeWithGradium,
 	transcribeWithGradium,
 } from '../src/audio/gradium-audio';
+import { audioForGradium, encodePcmWav, mixAndResample } from '../src/audio/pcm-wav';
 import { synthesizeWithGrok, transcribeWithGrok } from '../src/audio/grok-audio';
 import {
 	deepgramLanguage,
@@ -32,6 +33,7 @@ describe('speech provider list', () => {
 			'Groq',
 			'Grok',
 			'Gradium',
+			'Mistral',
 			'Deepgram',
 		]);
 		expect(SPEECH_OUTPUTS.map((item) => item.id)).toEqual([
@@ -39,6 +41,7 @@ describe('speech provider list', () => {
 			'openai',
 			'grok',
 			'gradium',
+			'mistral',
 			'elevenlabs',
 		]);
 	});
@@ -134,6 +137,31 @@ describe('Gradium', () => {
 		expect(gradiumContentType('audio/webm;codecs=opus')).toBeNull();
 	});
 
+	it('converts a WebM recording into 24 kHz mono wav', async () => {
+		const wav = encodePcmWav(Float32Array.from([1, -1]), 24_000);
+		expect(String.fromCharCode(...wav.slice(0, 4))).toBe('RIFF');
+		expect(new DataView(wav.buffer).getUint32(24, true)).toBe(24_000);
+		expect(new DataView(wav.buffer).getInt16(44, true)).toBe(32767);
+		expect(mixAndResample([Float32Array.from([0, 1, 0, 1])], 48_000, 24_000)).toEqual(
+			Float32Array.from([0.5, 0.5]),
+		);
+		const passed = await audioForGradium(Uint8Array.from([1]), 'audio/ogg', async () => {
+			throw new Error('should not decode ogg');
+		});
+		expect(passed.mime).toBe('audio/ogg');
+		const prepared = await audioForGradium(
+			Uint8Array.from([1, 2, 3, 4]),
+			'audio/webm;codecs=opus',
+			async () => ({
+				sampleRate: 48_000,
+				channels: [Float32Array.from([0.25, -0.25, 0.25, -0.25])],
+			}),
+		);
+		expect(prepared.mime).toBe('audio/wav');
+		expect(gradiumContentType(prepared.mime)).toBe('audio/wav');
+		expect(prepared.bytes.byteLength).toBe(44 + 4);
+	});
+
 	it('reads transcript lines and sends the key as x-api-key', async () => {
 		expect(
 			readGradiumTranscript(
@@ -197,6 +225,7 @@ describe('cloud speech routing', () => {
 				groq: 'gsk-test',
 				grok: '',
 				gradium: '',
+				mistral: '',
 				deepgram: '',
 				elevenlabs: '',
 			},
@@ -226,6 +255,7 @@ describe('cloud speech routing', () => {
 				groq: '',
 				grok: '',
 				gradium: '',
+				mistral: '',
 				deepgram: '',
 				elevenlabs: '',
 			},
@@ -261,6 +291,7 @@ describe('cloud speech routing', () => {
 				groq: '',
 				grok: 'xai-secret',
 				gradium: '',
+				mistral: '',
 				deepgram: '',
 				elevenlabs: '',
 			},
@@ -274,6 +305,65 @@ describe('cloud speech routing', () => {
 		expect(captured?.body).toContain('"language":"fr"');
 		expect(captured?.body).toContain('"voice_id":"ara"');
 		expect(() => gradiumLanguage('ja')).toThrow(/French/);
+	});
+
+	it('sends Mistral transcription with x-api-key and reads spoken audio', async () => {
+		const settings = normalizeSettings({
+			speechInput: 'mistral',
+			speechOutput: 'mistral',
+			speechKeys: {
+				openai: '',
+				groq: '',
+				grok: '',
+				gradium: '',
+				mistral: 'mistral-secret',
+				deepgram: '',
+				elevenlabs: '',
+			},
+			transcriptionModel: 'voxtral-mini-latest',
+			speechModel: 'voxtral-mini-tts-2603',
+			speechVoice: 'voice-1',
+		});
+		let captured: HttpRequest | undefined;
+		const text = await transcribeCloud(
+			settings,
+			Uint8Array.from([1, 2, 3]),
+			'audio/webm',
+			new AbortController().signal,
+			async (request) => {
+				captured = request;
+				return { status: 200, body: JSON.stringify({ text: 'hello vault' }) };
+			},
+		);
+		expect(text).toBe('hello vault');
+		expect(captured?.url).toBe('https://api.mistral.ai/v1/audio/transcriptions');
+		expect(captured?.headers['x-api-key']).toBe('mistral-secret');
+		expect(captured?.headers.Authorization).toBeUndefined();
+		expect(captured?.body).not.toContain('mistral-secret');
+		const spoken = await synthesizeCloud(
+			settings,
+			'Read this',
+			new AbortController().signal,
+			async (request) => {
+				captured = request;
+				return { status: 200, body: JSON.stringify({ audio_data: 'QQ==' }) };
+			},
+		);
+		expect(spoken.mime).toBe('audio/mpeg');
+		expect(captured?.url).toBe('https://api.mistral.ai/v1/audio/speech');
+		expect(captured?.headers.Authorization).toBe('Bearer mistral-secret');
+		expect(captured?.body).toContain('"voice_id":"voice-1"');
+		expect(captured?.body).toContain('"model":"voxtral-mini-tts-2603"');
+		expect(captured?.body).not.toContain('mistral-secret');
+		expect(new Uint8Array(spoken.bytes)).toEqual(Uint8Array.from([65]));
+		await expect(
+			synthesizeCloud(
+				settings,
+				'Read this',
+				new AbortController().signal,
+				async () => ({ status: 400, body: JSON.stringify({ detail: 'nope Read this' }) }),
+			),
+		).rejects.toThrow(/^(?!.*Read this)/);
 	});
 });
 
@@ -398,6 +488,12 @@ describe('voice list', () => {
 		expect(() => readVoiceList('{"voices":[{"voice_id":"xai-secret"}]}', 'xai-secret')).toThrow(
 			/could not read/i,
 		);
+		expect(
+			readVoiceList(
+				JSON.stringify({ data: [{ id: 'voice-1', name: 'Ada' }] }),
+				'mistral-secret',
+			),
+		).toEqual([{ id: 'voice-1', name: 'Ada' }]);
 	});
 });
 

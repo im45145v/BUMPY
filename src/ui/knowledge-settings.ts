@@ -1,5 +1,20 @@
-import { Setting } from 'obsidian';
+import { DropdownComponent, Setting } from 'obsidian';
+import {
+	EMBEDDING_MODEL_CHOICES,
+	defaultEmbeddingModel,
+	withCurrentModel,
+	type ProviderPreset,
+} from '../providers/presets';
 import type { BumpySettings, SettingsOwner } from '../settings';
+
+let embeddingMenu: DropdownComponent | undefined;
+
+export function applyEmbeddingDefault(owner: SettingsOwner, preset: ProviderPreset): void {
+	const next = defaultEmbeddingModel(preset);
+	if (next === '') return;
+	owner.settings.embeddingModel = next;
+	embeddingMenu?.setValue(next);
+}
 
 const EMBEDDINGS: Array<{ value: BumpySettings['embeddings']; label: string }> = [
 	{ value: 'local', label: 'Local hashing' },
@@ -10,6 +25,7 @@ const SEARCH: Array<{ value: BumpySettings['searchProvider']; label: string }> =
 	{ value: 'off', label: 'Off' },
 	{ value: 'searxng', label: 'Searxng' },
 	{ value: 'brave', label: 'Brave' },
+	{ value: 'tavily', label: 'Tavily' },
 ];
 
 export function renderKnowledgeSettings(
@@ -35,9 +51,8 @@ export function knowledgeRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Embedding model',
-			desc: 'Used only when embeddings are set to the provider.',
-			render: (setting) =>
-				addText(setting, owner, 'embeddingModel', 'nomic-embed-text'),
+			desc: 'Used only when embeddings are set to the provider. Choosing Mistral selects mistral-embed. A saved name that is not on the list stays available.',
+			render: (setting) => addEmbeddingModel(setting, owner),
 		},
 		{
 			name: 'Web search',
@@ -46,12 +61,12 @@ export function knowledgeRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Search URL',
-			desc: 'Searxng base URL. Brave uses its own API address.',
+			desc: 'Searxng base URL. Brave and Tavily use their own API addresses.',
 			render: (setting) => addText(setting, owner, 'searchUrl', 'http://127.0.0.1:8080'),
 		},
 		{
 			name: 'Search API key',
-			desc: "Stored in this vault's plugin data on this device. Brave uses it. It is not written into notes.",
+			desc: "Stored in this vault's plugin data on this device. Brave and Tavily use it. It is not written into notes.",
 			render: (setting) => addSecret(setting, owner),
 		},
 		{
@@ -65,6 +80,20 @@ export function knowledgeRows(owner: SettingsOwner): Array<{
 			render: (setting) => addDays(setting, owner),
 		},
 	];
+}
+
+function addEmbeddingModel(setting: Setting, owner: SettingsOwner): void {
+	setting.addDropdown((dropdown) => {
+		embeddingMenu = dropdown;
+		const options = withCurrentModel(EMBEDDING_MODEL_CHOICES, owner.settings.embeddingModel);
+		for (const model of options) dropdown.addOption(model, model);
+		const current = owner.settings.embeddingModel.trim();
+		dropdown.setValue(options.includes(current) ? current : (options[0] ?? ''));
+		dropdown.onChange(async (value) => {
+			owner.settings.embeddingModel = value;
+			await owner.saveSettings();
+		});
+	});
 }
 
 function addEmbeddings(setting: Setting, owner: SettingsOwner): void {
@@ -82,7 +111,9 @@ function addSearch(setting: Setting, owner: SettingsOwner): void {
 	setting.addDropdown((dropdown) => {
 		for (const choice of SEARCH) dropdown.addOption(choice.value, choice.label);
 		dropdown.setValue(owner.settings.searchProvider).onChange(async (value) => {
-			if (value !== 'off' && value !== 'searxng' && value !== 'brave') return;
+			if (value !== 'off' && value !== 'searxng' && value !== 'brave' && value !== 'tavily') {
+				return;
+			}
 			owner.settings.searchProvider = value;
 			await owner.saveSettings();
 		});

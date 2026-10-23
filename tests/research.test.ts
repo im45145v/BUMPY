@@ -156,4 +156,51 @@ describe('web search', () => {
 		).catch((error: unknown) => error);
 		expect((failed as Error).message).not.toContain('brave-secret-key');
 	});
+
+	it('posts the topic to Tavily and keeps the key out of the body', async () => {
+		let captured: HttpRequest | undefined;
+		const hits = await searchWeb(
+			async (request) => {
+				captured = request;
+				return {
+					status: 200,
+					body: JSON.stringify({
+						results: [
+							{
+								title: 'Guide',
+								url: 'https://example.com/a',
+								content: 'A snippet',
+								score: 0.9,
+							},
+						],
+					}),
+				};
+			},
+			'tavily',
+			'',
+			'tvly-secret',
+			'tomatoes',
+		);
+		expect(hits).toEqual([
+			{ title: 'Guide', url: 'https://example.com/a', snippet: 'A snippet' },
+		]);
+		expect(captured?.method).toBe('POST');
+		expect(captured?.url).toBe('https://api.tavily.com/search');
+		expect(captured?.headers.Authorization).toBe('Bearer tvly-secret');
+		expect(captured?.body).toContain('"query":"tomatoes"');
+		expect(captured?.body).toContain('"search_depth":"basic"');
+		expect(captured?.body).not.toContain('tvly-secret');
+		const failed = await searchWeb(
+			async () => ({
+				status: 401,
+				body: JSON.stringify({ detail: 'bad tvly-secret' }),
+			}),
+			'tavily',
+			'',
+			'tvly-secret',
+			'tomatoes',
+		).catch((error: unknown) => error);
+		expect((failed as Error).message).not.toContain('tvly-secret');
+		expect((failed as Error).message).toContain('401');
+	});
 });
