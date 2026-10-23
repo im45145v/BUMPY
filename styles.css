@@ -100,6 +100,35 @@
 	margin-bottom: 4px;
 }
 
+.bumpy-setup-view h2,
+.bumpy-setup-view h3 {
+	margin-top: 1.2em;
+}
+
+.bumpy-setup-guide {
+	margin: 0 0 1.25em;
+	padding-bottom: 0.25em;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.bumpy-setup-actions {
+	border: none;
+	padding-top: 0;
+}
+
+.bumpy-setup-actions .setting-item-info {
+	display: none;
+}
+
+.bumpy-setup-actions .setting-item-control {
+	justify-content: flex-start;
+	flex-wrap: wrap;
+}
+
+.bumpy-setup-actions button {
+	margin: 0 8px 8px 0;
+}
+
 button.bumpy-calendar-task {
 	display: block;
 	width: 100%;

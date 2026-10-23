@@ -6,6 +6,7 @@ These commands are available from the command palette:
 
 | Command | What it does |
 |---|---|
+| **Open setup** | Opens setup steps for each provider. Buttons there fill settings, and Ollama can download a model |
 | **Clean up** | Cleans the selection when text is selected, and the whole note when it is not. Previews the change before writing |
 | **Clean up selection** / **Clean up note** | Cleans only the selection, or the whole note even when text is selected |
 | **Dictate** | Records speech, lets you edit the transcript, then inserts it or sends it through cleanup |
@@ -19,6 +20,12 @@ These commands are available from the command palette:
 | **Daily briefing** / **Summarize journal** / **Trace thoughts** | Drafts a local briefing, journal digest, or timeline for you to create |
 | **Find knowledge gaps** | Points at short sections, questions, and follow-up lines |
 | **Suggest tasks** | Finds task phrases in the current note and adds only the ones you select |
+
+## Setup
+
+Step-by-step setup for every provider is in [docs/setup.md](docs/setup.md). The same page is inside Obsidian: run **Open setup**, or select **Open setup** at the top of **Settings → Bumpy**.
+
+That page can select Ollama, LM Studio, local hashing, the app speech service, or SearXNG, and open the key page for a cloud provider. When Ollama is already running on this computer, **Download llama3.2** and **Download nomic-embed-text** ask Ollama to fetch those models. Bumpy only talks to the local Ollama app. Ollama then downloads the model from its own library.
 
 ## Provider
 

@@ -1,6 +1,7 @@
 import { Plugin } from 'obsidian';
 import { registerCommands } from './commands';
 import { registerKnowledge } from './commands/knowledge';
+import { registerSetup } from './commands/setup';
 import { registerTaskFeatures } from './commands/tasks';
 import { RequestScope } from './requests/scope';
 import { readFiredReminders } from './tasks/reminders';
@@ -15,6 +16,7 @@ export default class BumpyPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		this.addSettingTab(new BumpySettingTab(this.app, this));
+		registerSetup(this);
 		registerCommands(this);
 		registerTaskFeatures(this);
 		registerKnowledge(this);

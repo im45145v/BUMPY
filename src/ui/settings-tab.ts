@@ -25,6 +25,7 @@ import {
 } from '../settings';
 import { featureProviderRows } from './feature-providers';
 import { knowledgeRows, renderKnowledgeSettings } from './knowledge-settings';
+import { closeSettings, openSetup } from './setup-view';
 import { renderSpeechSettings, speechRows } from './speech-settings';
 import { renderTaskSettings, taskRows } from './task-settings';
 
@@ -40,6 +41,11 @@ export class BumpySettingTab extends PluginSettingTab {
 	// The API key stays a custom row so the field can be a password input.
 	getSettingDefinitions(): SettingDefinition[] {
 		return [
+			{
+				name: 'Setup',
+				desc: SETUP_DESC,
+				render: (setting) => this.addSetup(setting),
+			},
 			{
 				name: 'Provider',
 				desc: PROVIDER_DESC,
@@ -90,6 +96,8 @@ export class BumpySettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
+		this.addSetup(new Setting(containerEl).setName('Setup').setDesc(SETUP_DESC));
+
 		this.addPreset(
 			new Setting(containerEl).setName('Provider').setDesc(PROVIDER_DESC),
 		);
@@ -139,6 +147,14 @@ export class BumpySettingTab extends PluginSettingTab {
 		renderSpeechSettings(containerEl, this.owner);
 		renderTaskSettings(containerEl, this.owner);
 		renderKnowledgeSettings(containerEl, this.owner);
+	}
+
+	private addSetup(setting: Setting): void {
+		setting.addButton((button) => {
+			button.setButtonText('Open setup').setCta().onClick(() => {
+				void openSetup(this.app).then(() => closeSettings(this.app));
+			});
+		});
 	}
 
 	private addPreset(setting: Setting): void {
@@ -249,6 +265,9 @@ export class BumpySettingTab extends PluginSettingTab {
 function showControl(element: HTMLElement, visible: boolean): void {
 	element.style.display = visible ? '' : 'none';
 }
+
+const SETUP_DESC =
+	'Steps for each provider, including local servers. Ollama can download a model from this page.';
 
 const MODEL_DESC =
 	'Choose a model from the provider list. A saved name that is not on the list stays available. Ollama, LM Studio, OpenRouter, and Custom keep the name you type.';
