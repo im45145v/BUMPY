@@ -2,7 +2,7 @@ import { ItemView, MarkdownView, TFile, type WorkspaceLeaf } from 'obsidian';
 import { buildMonth, dueTasks, localIso } from '../tasks/calendar';
 import { tasksIn, type MarkdownTask } from '../tasks/parse';
 import { parseFolders } from '../linking/suggest';
-import { readMarkdownNotes } from '../vault/notes';
+import { readTaskNotes } from '../vault/notes';
 import type { CleanupHost } from '../commands/cleanup';
 
 export const CALENDAR_VIEW = 'bumpy-calendar';
@@ -57,7 +57,7 @@ export class CalendarView extends ItemView {
 			void this.draw();
 		});
 
-		const notes = await readMarkdownNotes(
+		const { notes } = await readTaskNotes(
 			this.app,
 			parseFolders(this.host.settings.excludedFolders),
 		);

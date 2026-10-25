@@ -23,7 +23,7 @@ import type { SettingsOwner } from '../settings';
 const URL_DESC = 'Used only when this feature has its own provider.';
 const MODEL_DESC = 'Model name for this feature. Used only when it has its own provider.';
 const KEY_DESC =
-	"API key for this feature. Stored in this vault's plugin data on this device. It is not written into notes.";
+	'API key for this feature. Stored on this device only. It is not written into notes or the synced vault.';
 
 interface Widgets {
 	details: HTMLElement[];

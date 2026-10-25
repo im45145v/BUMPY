@@ -13,8 +13,7 @@ export function decideReplacement(
 	if (current !== original) {
 		return {
 			ok: false,
-			reason:
-				'This text changed while the preview was open. Discard the preview and run the cleanup again.',
+			reason: 'This note changed while the preview was open. Discard it and try again.',
 		};
 	}
 	if (current === proposed) {

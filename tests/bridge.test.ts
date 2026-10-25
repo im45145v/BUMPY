@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { passagesForQuestion } from '../src/bridge/search';
 import { hashEmbed, type StoredChunk } from '../src/rag/index';
-import { runVaultJob, spokenPreview, type VaultSurface } from '../src/bridge/jobs';
+import { CALL_NOTE_LIMIT, runVaultJob, spokenPreview, type VaultSurface } from '../src/bridge/jobs';
 import { bridgeEndpoint, createBridgePoller, pollCallBridge } from '../src/bridge/poll';
 import { normalizeSettings } from '../src/settings';
 import type { HttpClient, HttpRequest } from '../src/providers/types';
@@ -98,6 +98,37 @@ describe('vault jobs', () => {
 		expect(writes).toEqual(['Home.md']);
 	});
 
+	it('reads a whole short note and refuses to rewrite a long one', async () => {
+		const notes = {
+			'Short.md': 'A short note.',
+			'Long.md': 'x'.repeat(CALL_NOTE_LIMIT + 50),
+		};
+		const { surface, writes } = memory(notes);
+		const read = await runVaultJob(surface, {
+			id: 'read00002',
+			name: 'vault.read',
+			arguments: { path: 'Short.md' },
+		});
+		expect(read).toEqual({ ok: true, result: 'A short note.' });
+		const excerpt = await runVaultJob(surface, {
+			id: 'read00003',
+			name: 'vault.read',
+			arguments: { path: 'Long.md' },
+		});
+		expect(excerpt.ok).toBe(true);
+		expect(String(excerpt.ok ? excerpt.result : '')).toContain('too long to change on a call');
+		const preview = await runVaultJob(surface, {
+			id: 'preview02',
+			name: 'vault.preview',
+			arguments: { path: 'Long.md', proposed: 'replacement' },
+		});
+		expect(preview).toEqual({
+			ok: false,
+			error: 'That note is too long to change on a call. Edit it in Obsidian.',
+		});
+		expect(writes).toEqual([]);
+	});
+
 	it('refuses a path outside the vault and an unknown tool', async () => {
 		const { surface, writes } = memory({ 'Home.md': 'note' });
 		const escaped = await runVaultJob(surface, {
@@ -125,8 +156,14 @@ describe('vault jobs', () => {
 			vector: hashEmbed(text),
 		};
 		const passages = await passagesForQuestion(
-			{ files: {}, chunks: [chunk], embeddings: 'local', embeddingModel: '' },
-			'local',
+			{
+				files: {},
+				chunks: [chunk],
+				embeddings: 'local',
+				embeddingModel: '',
+				omitted: {},
+				ready: true,
+			},
 			[],
 			() => true,
 			'When is rent due?',
@@ -209,6 +246,79 @@ describe('polling', () => {
 		await second;
 	});
 
+	it('opens a preview only after the board accepts it', async () => {
+		let opened = false;
+		const settings = normalizeSettings({
+			callBridge: true,
+			callBridgeUrl: 'http://127.0.0.1:8444',
+			callBridgeToken: 'token',
+		});
+		const http = recording([], (request) => {
+			if (request.method === 'GET') {
+				return {
+					status: 200,
+					body: JSON.stringify({
+						job: {
+							id: 'preview99',
+							name: 'vault.preview',
+							arguments: { path: 'Home.md', proposed: 'Hello there' },
+						},
+						preview: false,
+					}),
+				};
+			}
+			return { status: 404, body: '{"error":"gone"}' };
+		});
+		const { surface } = memory({ 'Home.md': 'Hello' });
+		surface.showPreview = () => {
+			opened = true;
+		};
+		let released = false;
+		await pollCallBridge(http, settings, surface, {
+			onPreview: () => {
+				released = true;
+			},
+		});
+		expect(opened).toBe(false);
+		expect(released).toBe(true);
+	});
+
+	it('closes the preview after a spoken apply is written', async () => {
+		let closed = false;
+		const settings = normalizeSettings({
+			callBridge: true,
+			callBridgeUrl: 'http://127.0.0.1:8444',
+			callBridgeToken: 'token',
+		});
+		const http = recording([], (request) => {
+			if (request.method === 'GET') {
+				return {
+					status: 200,
+					body: JSON.stringify({
+						job: {
+							id: 'apply0001',
+							name: 'vault.apply',
+							arguments: {
+								path: 'Home.md',
+								original: 'Hello',
+								proposed: 'Hello there',
+							},
+						},
+						preview: true,
+					}),
+				};
+			}
+			return { status: 200, body: '{}' };
+		});
+		const { surface } = memory({ 'Home.md': 'Hello' });
+		await pollCallBridge(http, settings, surface, {
+			onPreview: (open) => {
+				if (!open) closed = true;
+			},
+		});
+		expect(closed).toBe(true);
+	});
+
 	it('stays quiet when the board is down', async () => {
 		const http: HttpClient = async () => {
 			throw new Error('down');
@@ -234,7 +344,10 @@ function memory(notes: Record<string, string>): { surface: VaultSurface; writes:
 		notes: async () =>
 			Object.entries(notes).map(([path, text]) => ({ path, title: path, text })),
 		read: async (path) => (path in notes ? notes[path] ?? null : null),
-		write: async (path, text) => {
+		write: async (path, text, expected) => {
+			if (expected !== undefined && notes[path] !== expected) {
+				throw new Error('This note changed while the preview was open. Discard it and try again.');
+			}
 			writes.push(path);
 			notes[path] = text;
 		},

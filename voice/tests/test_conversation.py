@@ -120,9 +120,13 @@ def test_apply_is_spoken_only_after_agreement() -> None:
         queue.complete(job["id"], {"ok": True, "result": {"written": True}})
 
     talk.handle("yes but change the date")
-    assert tools.has_pending() is False
-    assert any(item[0] == "model" for item in order)
+    assert tools.has_pending() is True
+    assert ("say", "A preview is still open. Say apply to write it, or discard to cancel.") in order
+    assert not any(item[0] == "model" for item in order)
 
+    talk.handle("discard")
+    assert tools.has_pending() is False
+    assert ("say", "Discarded. The note was not changed.") in order
     tools.pending.store({"path": "Home.md", "original": "old", "proposed": "new"})
     thread = threading.Thread(target=worker)
     thread.start()

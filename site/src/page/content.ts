@@ -66,7 +66,7 @@ export const story: Record<
 	ask: {
 		title: "Ask what the vault already wrote.",
 		paragraphs: [
-			"Update vault index stores passage vectors in plugin data, not in the vault. Indexing does not run at startup. Ask the vault retrieves matching passages and, when a model is set, answers only from those passages.",
+			"Update vault index stores passage vectors next to the plugin, not in the vault. Indexing does not run at startup. Ask the vault retrieves matching passages and, when a model is set, answers only from those passages.",
 			"Embeddings default to local hashing. That mode stays on the device and matches shared words. It is not a neural model. The answer lists its source notes.",
 		],
 	},
@@ -182,7 +182,7 @@ export const commandGroups = [
 		commands: [
 			{
 				name: "Update vault index",
-				detail: "Indexes notes into plugin data.",
+				detail: "Indexes notes beside the plugin.",
 			},
 			{
 				name: "Ask the vault",
@@ -355,7 +355,7 @@ export const searchChoices = [
 	{
 		name: "Brave",
 		detail:
-			"Uses https://api.search.brave.com. The key is stored in plugin data and sent as a header.",
+			"Uses https://api.search.brave.com. The key stays on this device and is sent as a header.",
 	},
 	{
 		name: "Tavily",
@@ -386,7 +386,7 @@ export const specGroups = [
 	{
 		title: "Vault index",
 		items: [
-			"Passages are stored in plugin data, not in the note.",
+			"Passages are stored next to the plugin, not in the note.",
 			"Excluded folders are skipped. The default is .trash. The same folders are skipped for links, tasks, and briefings.",
 			"Notes longer than 200,000 characters are left out.",
 			"A note with bumpy-index: false in frontmatter is left out.",
@@ -414,7 +414,7 @@ export const specGroups = [
 		title: "Google Calendar",
 		items: [
 			"Sync does nothing until a Google calendar ID and a Google access token are set.",
-			"The token is stored in plugin data and is not written into notes. Bumpy does not refresh the token.",
+			"The token stays on this device and is not written into notes. A refresh token renews it when you sync.",
 			"The usual calendar id is primary.",
 			"A task with a time becomes a 30-minute event in the local time zone. A task with only a date stays an all-day event.",
 			"Events that Bumpy did not create are left alone.",

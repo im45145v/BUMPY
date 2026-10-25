@@ -35,6 +35,9 @@ export interface BumpySettings {
 	excludedFolders: string;
 	calendarConflict: 'ask' | 'vault-wins' | 'calendar-wins';
 	googleAccessToken: string;
+	googleClientId: string;
+	googleClientSecret: string;
+	googleRefreshToken: string;
 	googleCalendarId: string;
 	reminderHour: number;
 	systemReminders: boolean;
@@ -66,6 +69,9 @@ export const DEFAULT_SETTINGS: BumpySettings = {
 	excludedFolders: '.trash',
 	calendarConflict: 'ask',
 	googleAccessToken: '',
+	googleClientId: '',
+	googleClientSecret: '',
+	googleRefreshToken: '',
 	googleCalendarId: '',
 	reminderHour: 9,
 	systemReminders: true,
@@ -121,6 +127,9 @@ export function normalizeSettings(
 		),
 		calendarConflict: conflictSetting(source.calendarConflict),
 		googleAccessToken: textSetting(source.googleAccessToken, ''),
+		googleClientId: textSetting(source.googleClientId, ''),
+		googleClientSecret: textSetting(source.googleClientSecret, ''),
+		googleRefreshToken: textSetting(source.googleRefreshToken, ''),
 		googleCalendarId: textSetting(source.googleCalendarId, ''),
 		reminderHour: hourSetting(source.reminderHour),
 		systemReminders: source.systemReminders !== false,

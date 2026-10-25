@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Any, Callable
@@ -62,8 +63,8 @@ class FileSandbox:
         if not isinstance(argument, str) or "\x00" in argument or len(argument) > 200:
             raise ToolError("invalid arguments")
         command = list(argv)
-        if argument != "":
-            command.append(argument)
+        env = os.environ.copy()
+        env["BUMPY_ARGUMENT"] = argument
         try:
             result = self.runner(
                 command,
@@ -72,6 +73,7 @@ class FileSandbox:
                 capture_output=True,
                 timeout=self.timeout,
                 check=False,
+                env=env,
             )
         except subprocess.TimeoutExpired as error:
             raise ToolError("That script took too long.") from error

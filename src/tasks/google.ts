@@ -7,6 +7,58 @@ import {
 } from '../providers/types';
 import type { TrackedEvent } from './sync';
 
+export async function refreshGoogleAccessToken(
+	http: HttpClient,
+	clientId: string,
+	clientSecret: string,
+	refreshToken: string,
+	signal?: AbortSignal,
+): Promise<string> {
+	const body = new URLSearchParams({
+		client_id: clientId,
+		client_secret: clientSecret,
+		refresh_token: refreshToken,
+		grant_type: 'refresh_token',
+	});
+	let response;
+	try {
+		response = await untilAbort(
+			http({
+				url: 'https://oauth2.googleapis.com/token',
+				method: 'POST',
+				headers: {},
+				contentType: 'application/x-www-form-urlencoded',
+				body: body.toString(),
+				signal,
+			}),
+			signal,
+		);
+	} catch (error) {
+		if (signal?.aborted || error instanceof RequestCancelledError) throw new RequestCancelledError();
+		throw new ProviderError('Could not reach Google to renew the access token.');
+	}
+	if (signal?.aborted) throw new RequestCancelledError();
+	if (response.status < 200 || response.status >= 300) {
+		throw new ProviderError(
+			'Google did not renew the access token. Check the client ID, client secret, and refresh token in settings.',
+		);
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(response.body) as unknown;
+	} catch {
+		throw new ProviderError('Google returned an unreadable token.');
+	}
+	const access =
+		parsed && typeof parsed === 'object'
+			? (parsed as { access_token?: unknown }).access_token
+			: undefined;
+	if (typeof access !== 'string' || access.trim() === '') {
+		throw new ProviderError('Google did not return a new access token.');
+	}
+	return access.trim();
+}
+
 export async function listGoogleEvents(
 	http: HttpClient,
 	calendarId: string,
@@ -202,7 +254,9 @@ function failure(status: number, body: string, token: string): string {
 	}
 	detail = detail.replace(/\s+/g, ' ').trim().slice(0, 180);
 	if (revealsSensitiveText(detail, [token])) detail = '';
-	if (status === 401) return 'Google Calendar declined the access token.';
+	if (status === 401) {
+		return 'The Google access token expired. Paste a new one in settings, or add a refresh token so sync can renew it.';
+	}
 	if (detail) return `Google Calendar request failed (${status}). ${detail}`;
 	return `Google Calendar request failed (${status}).`;
 }

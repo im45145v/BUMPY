@@ -46,8 +46,23 @@ export function taskRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Google access token',
-			desc: 'Optional access token stored in plugin data on this device. It is not written into notes.',
-			render: (setting) => addSecret(setting, owner),
+			desc: 'Optional. Expires quickly. Stored on this device only. Paste a token for one sync, or add a refresh token below and sync renews it.',
+			render: (setting) => addSecret(setting, owner, 'googleAccessToken', 'Optional'),
+		},
+		{
+			name: 'Google client ID',
+			desc: 'Optional. Used with the client secret and refresh token to renew the access token when you sync.',
+			render: (setting) => addText(setting, owner, 'googleClientId', 'Optional'),
+		},
+		{
+			name: 'Google client secret',
+			desc: 'Optional. Stored on this device only. It is not written into notes or the synced vault.',
+			render: (setting) => addSecret(setting, owner, 'googleClientSecret', 'Optional'),
+		},
+		{
+			name: 'Google refresh token',
+			desc: 'Optional. When this, the client ID, and the client secret are set, sync asks Google for a new access token.',
+			render: (setting) => addSecret(setting, owner, 'googleRefreshToken', 'Optional'),
 		},
 	];
 }
@@ -94,7 +109,7 @@ function addConflict(setting: Setting, owner: SettingsOwner): void {
 function addText(
 	setting: Setting,
 	owner: SettingsOwner,
-	key: 'googleCalendarId',
+	key: 'googleCalendarId' | 'googleClientId',
 	placeholder: string,
 ): void {
 	setting.addText((text) => {
@@ -108,15 +123,20 @@ function addText(
 	});
 }
 
-function addSecret(setting: Setting, owner: SettingsOwner): void {
+function addSecret(
+	setting: Setting,
+	owner: SettingsOwner,
+	key: 'googleAccessToken' | 'googleClientSecret' | 'googleRefreshToken',
+	placeholder: string,
+): void {
 	setting.addText((text) => {
 		text.inputEl.type = 'password';
 		text.inputEl.autocomplete = 'off';
 		text
-			.setPlaceholder('Optional')
-			.setValue(owner.settings.googleAccessToken)
+			.setPlaceholder(placeholder)
+			.setValue(owner.settings[key])
 			.onChange((value) => {
-				owner.settings.googleAccessToken = value;
+				owner.settings[key] = value;
 				owner.scheduleSave();
 			});
 	});

@@ -14,18 +14,19 @@ import { embedInBatches } from '../rag/batch';
 import {
 	assembleIndex,
 	hashEmbed,
+	indexUnavailableReason,
 	planReindex,
 	retrievableChunks,
 	searchChunks,
 	type StoredChunk,
 } from '../rag/index';
 import { embedWithProvider } from '../rag/provider-embed';
-import { loadStoredIndex, saveStoredIndex } from '../rag/store';
+import { loadStoredIndex, pluginIndexFile, saveStoredIndex } from '../rag/store';
 import { parseFolders } from '../linking/suggest';
 import { AnswerModal } from '../ui/answer-modal';
 import { pendingNotice } from '../ui/pending';
 import { QuestionModal } from '../ui/question-modal';
-import { readMarkdownNotes } from '../vault/notes';
+import { readTimedNotes } from '../vault/notes';
 import type { DataHost } from './knowledge';
 import { KNOWLEDGE_COMMANDS } from './knowledge-specs';
 
@@ -59,11 +60,12 @@ async function updateIndex(plugin: DataHost): Promise<void> {
 	const controller = plugin.requests.start();
 	const pending = pendingNotice('Updating the index…', controller);
 	try {
-		const notes = await readMarkdownNotes(
+		const notes = await readTimedNotes(
 			plugin.app,
 			parseFolders(plugin.settings.excludedFolders),
 		);
-		const existing = await loadStoredIndex(() => plugin.loadData());
+		const indexFile = pluginIndexFile(plugin);
+		const existing = await loadStoredIndex(indexFile, () => plugin.loadData());
 		const embeddings = resolveFeature(plugin.settings, 'embeddings');
 		const mode = {
 			embeddings: plugin.settings.embeddings,
@@ -83,12 +85,13 @@ async function updateIndex(plugin: DataHost): Promise<void> {
 			...chunk,
 			vector: vectors[index] ?? [],
 		}));
-		const assembled = assembleIndex(plan.kept, embedded, plan.hashes, mode);
-		await saveStoredIndex(plugin, assembled.index);
+		const assembled = assembleIndex(plan.kept, embedded, plan.hashes, mode, plan.omitted);
+		await saveStoredIndex(indexFile, plugin, assembled.index);
 		const count = Object.keys(assembled.index.files).length;
+		const leftOut = Object.keys(assembled.index.omitted).length;
 		new Notice(
-			assembled.truncated
-				? `Indexed ${count} notes. Some passages were left out of the index.`
+			leftOut > 0
+				? `Indexed ${count} notes. ${leftOut} older notes did not fit and were left out.`
 				: `Indexed ${count} notes.`,
 		);
 	} catch (error) {
@@ -107,9 +110,20 @@ async function askVault(plugin: DataHost, question: string): Promise<void> {
 	const controller = plugin.requests.start();
 	const pending = pendingNotice('Asking the vault…', controller);
 	try {
-		const index = await loadStoredIndex(() => plugin.loadData());
-		if (index.chunks.length === 0 || index.embeddings !== plugin.settings.embeddings) {
-			new Notice('Update the vault index first.');
+		const index = await loadStoredIndex(pluginIndexFile(plugin), () => plugin.loadData());
+		const embeddingMode = {
+			embeddings: plugin.settings.embeddings,
+			model:
+				plugin.settings.embeddings === 'provider'
+					? embeddingIndexModel(
+							plugin.settings.embeddingModel,
+							resolveFeature(plugin.settings, 'embeddings'),
+						)
+					: '',
+		};
+		const unavailable = indexUnavailableReason(index, embeddingMode);
+		if (unavailable) {
+			new Notice(unavailable);
 			return;
 		}
 		const chunks = retrievableChunks(

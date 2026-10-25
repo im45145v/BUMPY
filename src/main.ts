@@ -1,15 +1,28 @@
 import { Platform, Plugin } from 'obsidian';
 import { obsidianVaultSurface } from './bridge/host';
+import { closeCallPreview } from './bridge/preview';
 import { createBridgePoller } from './bridge/poll';
 import { registerCommands } from './commands';
 import { registerKnowledge } from './commands/knowledge';
 import { registerSetup } from './commands/setup';
 import { registerTaskFeatures } from './commands/tasks';
 import { obsidianHttp } from './providers/obsidian-http';
+import { pluginIndexFile, settleIndexStorage } from './rag/store';
 import { RequestScope } from './requests/scope';
 import { normalizeSettings, type BumpySettings } from './settings';
 import { readFiredReminders } from './tasks/reminders';
 import { BumpySettingTab } from './ui/settings-tab';
+import {
+	applySettingsToPluginData,
+	browserSecretStore,
+	extractSecrets,
+	mergeDeviceSecrets,
+	pluginDataHasSecrets,
+	readDeviceSecrets,
+	secretsFromSettings,
+	vaultIdentity,
+	writeDeviceSecrets,
+} from './vault/device-secrets';
 import { updatePluginData } from './vault/plugin-data';
 
 export default class BumpyPlugin extends Plugin {
@@ -25,10 +38,12 @@ export default class BumpyPlugin extends Plugin {
 		registerCommands(this);
 		registerTaskFeatures(this);
 		registerKnowledge(this);
+		await settleIndexStorage(pluginIndexFile(this), this);
 		const poll = createBridgePoller(
 			obsidianHttp,
 			() => this.settings,
 			() => obsidianVaultSurface(this),
+			{ onPreview: (open) => { if (!open) closeCallPreview(); } },
 		);
 		this.registerInterval(
 			window.setInterval(() => {
@@ -60,15 +75,39 @@ export default class BumpyPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const stored: unknown = await this.loadData();
-		this.settings = normalizeSettings(stored as Partial<BumpySettings>);
+		const identity = vaultIdentity(this.app);
+		const store = browserSecretStore(this.app);
+		let device = readDeviceSecrets(store, identity);
+		const fromVault = extractSecrets(stored);
+		if (!device && fromVault) {
+			device = fromVault;
+			try {
+				writeDeviceSecrets(store, identity, device);
+			} catch {
+				// Keep the keys in plugin data until this device can store them.
+			}
+		}
+		this.settings = normalizeSettings(
+			mergeDeviceSecrets(stored, device) as Partial<BumpySettings>,
+		);
 		this.firedReminders.clear();
 		for (const key of readFiredReminders(stored)) this.firedReminders.add(key);
+		if (pluginDataHasSecrets(stored)) await this.saveSettings();
 	}
 
 	async saveSettings(): Promise<void> {
+		let storedOnDevice = true;
+		try {
+			writeDeviceSecrets(
+				browserSecretStore(this.app),
+				vaultIdentity(this.app),
+				secretsFromSettings(this.settings),
+			);
+		} catch {
+			storedOnDevice = false;
+		}
 		await updatePluginData(this, (data) => {
-			const snapshot = JSON.parse(JSON.stringify(this.settings)) as BumpySettings;
-			Object.assign(data, snapshot);
+			applySettingsToPluginData(data, this.settings, storedOnDevice);
 		});
 	}
 }

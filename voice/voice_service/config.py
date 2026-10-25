@@ -13,7 +13,7 @@ class ConfigError(Exception):
 
 @dataclass
 class VoiceConfig:
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     https_port: int = 8443
     bridge_port: int = 8444
     token: str = ""
@@ -32,13 +32,13 @@ class VoiceConfig:
     files_root: Path | None = None
     scripts: dict[str, list[str]] = field(default_factory=dict)
     script_timeout: float = 10.0
-    bridge_timeout: float = 20.0
+    bridge_timeout: float = 60.0
 
 
 def load_config(environ: dict[str, str] | None = None) -> VoiceConfig:
     env = os.environ if environ is None else environ
     return VoiceConfig(
-        host=text(env, "VOICE_HOST", "0.0.0.0"),
+        host=text(env, "VOICE_HOST", "127.0.0.1"),
         https_port=port(env, "VOICE_PORT", 8443),
         bridge_port=port(env, "VOICE_BRIDGE_PORT", 8444),
         token=text(env, "VOICE_TOKEN", ""),
@@ -57,7 +57,7 @@ def load_config(environ: dict[str, str] | None = None) -> VoiceConfig:
         files_root=folder(text(env, "VOICE_FILES_ROOT", "")),
         scripts=json_scripts(text(env, "VOICE_SCRIPTS", "")),
         script_timeout=number(env, "VOICE_SCRIPT_TIMEOUT", 10.0),
-        bridge_timeout=number(env, "VOICE_BRIDGE_TIMEOUT", 20.0),
+        bridge_timeout=number(env, "VOICE_BRIDGE_TIMEOUT", 60.0),
     )
 
 

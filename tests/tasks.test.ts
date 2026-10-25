@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildMonth, dueReminderKeys, dueTasks, reminderInstant } from '../src/tasks/calendar';
-import { createGoogleEvent, googleEventBody, listGoogleEvents, updateGoogleEvent } from '../src/tasks/google';
 import {
+	createGoogleEvent,
+	googleEventBody,
+	listGoogleEvents,
+	refreshGoogleAccessToken,
+	updateGoogleEvent,
+} from '../src/tasks/google';
+import {
+	pruneFiredReminders,
 	publishDesktopReminder,
 	readFiredReminders,
 	reminderKey,
@@ -123,6 +130,14 @@ describe('calendar and reminders', () => {
 		expect(readFiredReminders({ firedReminders: ['Tasks.md:2026-10-23::Pay rent', 4] })).toEqual([
 			'Tasks.md:2026-10-23::Pay rent',
 		]);
+		const firedKey = 'Tasks.md:2026-10-23::Pay rent';
+		const fired = new Set([firedKey, 'Gone.md:2026-10-23::Old']);
+		expect(pruneFiredReminders(fired, new Set(), new Set(['Tasks.md']))).toEqual([
+			'Gone.md:2026-10-23::Old',
+		]);
+		expect(pruneFiredReminders(fired, new Set([firedKey]), new Set())).toEqual([
+			'Gone.md:2026-10-23::Old',
+		]);
 	});
 
 	it('sends a computer notification only after permission is granted', async () => {
@@ -233,9 +248,22 @@ describe('calendar sync', () => {
 			'2026-11-01T00:00:00Z',
 		).catch((error: unknown) => error);
 		expect((denied as Error).message).toBe(
-			'Google Calendar declined the access token.',
+			'The Google access token expired. Paste a new one in settings, or add a refresh token so sync can renew it.',
 		);
 		expect((denied as Error).message).not.toContain('sk-calendar-secret');
+
+		const renewed = await refreshGoogleAccessToken(
+			async (request) => {
+				expect(request.url).toBe('https://oauth2.googleapis.com/token');
+				expect(request.body).toContain('grant_type=refresh_token');
+				expect(request.body).toContain('refresh_token=refresh-token');
+				return { status: 200, body: JSON.stringify({ access_token: 'ya29.new' }) };
+			},
+			'client-id',
+			'client-secret',
+			'refresh-token',
+		);
+		expect(renewed).toBe('ya29.new');
 	});
 
 	it('reads every calendar page before deciding an event is missing', async () => {

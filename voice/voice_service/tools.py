@@ -101,7 +101,8 @@ class ToolTable:
             message = str(error)[:300] if isinstance(error, str) and error else "The note was not written."
             if message == "Obsidian is not reachable.":
                 return "I could not confirm the write. Say apply to try again."
-            self.pending.clear()
+            if message == "That note is not available.":
+                self.pending.clear()
             return message
         self.pending.clear()
         result = outcome.get("result")
@@ -131,7 +132,8 @@ class ToolTable:
                 return spoken.strip()[:500]
             return "The preview is ready. Say apply to write it."
         if isinstance(result, str):
-            return result[:4000]
+            limit = 20_000 if name == "vault.read" else 4_000
+            return result[:limit]
         return json.dumps(result)[:4000]
 
 
@@ -177,11 +179,15 @@ def note_path(value: Any) -> str:
 
 
 AGREE = re.compile(
-    r"^(?:please\s+)?(?:apply(?:\s+it)?|write\s+it|write\s+that)[.!]?\s*$",
+    r"^(?:please\s+)?(?:apply(?:\s+it)?|write\s+it|write\s+that)(?:\s+please)?[.!]?\s*$",
     re.IGNORECASE,
 )
 AGREE_ANYWAY = re.compile(
-    r"^(?:please\s+)?(?:apply\s+anyway|write\s+it\s+anyway)[.!]?\s*$",
+    r"^(?:please\s+)?(?:apply\s+anyway|write\s+it\s+anyway)(?:\s+please)?[.!]?\s*$",
+    re.IGNORECASE,
+)
+DISCARD = re.compile(
+    r"^(?:please\s+)?(?:discard(?:\s+it)?|cancel(?:\s+it)?|never\s*mind)(?:\s+please)?[.!]?\s*$",
     re.IGNORECASE,
 )
 
@@ -193,6 +199,10 @@ def agrees(text: str, warnings: bool = False) -> bool:
     if warnings:
         return False
     return AGREE.fullmatch(phrase) is not None
+
+
+def discards(text: str) -> bool:
+    return DISCARD.fullmatch(text.strip()) is not None
 
 
 def apply_phrase(text: str) -> bool:

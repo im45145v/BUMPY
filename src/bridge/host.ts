@@ -1,12 +1,13 @@
 import { TFile, type App } from 'obsidian';
 import { isExcluded, parseFolders } from '../linking/suggest';
 import { obsidianHttp } from '../providers/obsidian-http';
-import { resolveFeature } from '../providers/features';
 import { usesBackboard } from '../providers/presets';
 import { embedWithProvider } from '../rag/provider-embed';
-import { loadStoredIndex } from '../rag/store';
+import { embeddingIndexModel, resolveFeature } from '../providers/features';
+import { indexUnavailableReason } from '../rag/index';
+import { loadStoredIndex, pluginIndexFile } from '../rag/store';
+import { readTaskNotes } from '../vault/notes';
 import type { BumpySettings } from '../settings';
-import { readMarkdownNotes } from '../vault/notes';
 import type { VaultSurface } from './jobs';
 import { openCallPreview } from './preview';
 import { localQueryVector, passagesForQuestion } from './search';
@@ -15,6 +16,7 @@ export interface BridgePlugin {
 	app: App;
 	settings: BumpySettings;
 	loadData(): Promise<unknown>;
+	manifest: { dir?: string };
 }
 
 export function obsidianVaultSurface(plugin: BridgePlugin): VaultSurface {
@@ -25,14 +27,24 @@ export function obsidianVaultSurface(plugin: BridgePlugin): VaultSurface {
 		if (!(file instanceof TFile)) return null;
 		return plugin.app.vault.read(file);
 	};
-	const write = async (path: string, text: string) => {
+	const write = async (path: string, text: string, expected?: string) => {
 		if (isExcluded(path, excluded())) throw new Error('That note is not available.');
 		const file = plugin.app.vault.getAbstractFileByPath(path);
 		if (!(file instanceof TFile)) throw new Error('That note is not available.');
-		await plugin.app.vault.modify(file, text);
+		let stale = false;
+		await plugin.app.vault.process(file, (data) => {
+			if (expected !== undefined && data !== expected) {
+				stale = true;
+				return data;
+			}
+			return text;
+		});
+		if (stale) {
+			throw new Error('This note changed while the preview was open. Discard it and try again.');
+		}
 	};
 	return {
-		notes: () => readMarkdownNotes(plugin.app, excluded()),
+		notes: async () => (await readTaskNotes(plugin.app, excluded())).notes,
 		read,
 		write,
 		search: (question) => searchVault(plugin, question),
@@ -43,11 +55,20 @@ export function obsidianVaultSurface(plugin: BridgePlugin): VaultSurface {
 }
 
 async function searchVault(plugin: BridgePlugin, question: string): Promise<string> {
-	const index = await loadStoredIndex(() => plugin.loadData());
+	const index = await loadStoredIndex(pluginIndexFile(plugin), () => plugin.loadData());
 	const excluded = parseFolders(plugin.settings.excludedFolders);
+	const endpoint = resolveFeature(plugin.settings, 'embeddings');
+	const model =
+		plugin.settings.embeddings === 'provider'
+			? embeddingIndexModel(plugin.settings.embeddingModel, endpoint)
+			: '';
+	const unavailable = indexUnavailableReason(index, {
+		embeddings: plugin.settings.embeddings,
+		model,
+	});
+	if (unavailable) throw new Error(unavailable);
 	return passagesForQuestion(
 		index,
-		plugin.settings.embeddings,
 		excluded,
 		(path) => plugin.app.vault.getAbstractFileByPath(path) instanceof TFile,
 		question,

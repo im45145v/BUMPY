@@ -23,12 +23,15 @@ export interface VaultNote {
 export interface VaultSurface {
 	notes(): Promise<VaultNote[]>;
 	read(path: string): Promise<string | null>;
-	write(path: string, text: string): Promise<void>;
+	write(path: string, text: string, expected?: string): Promise<void>;
 	search(question: string): Promise<string>;
 	showPreview?(preview: CallPreview): void;
 }
 
 const JOB_ID = /^[A-Za-z0-9-]{8,80}$/;
+
+/** A call may replace a note only when the whole note fits in what the model is shown. */
+export const CALL_NOTE_LIMIT = 20_000;
 
 export function readBridgeJob(body: string): BridgeJob | null {
 	let parsed: unknown;
@@ -68,15 +71,17 @@ export async function runVaultJob(
 			if (!path) return fail('invalid arguments');
 			const text = await surface.read(path);
 			if (text === null) return fail('That note is not available.');
-			return ok(shorten(text, 8000));
+			return ok(noteForCall(text));
 		}
 		if (job.name === 'vault.preview') {
 			const path = vaultPath(job.arguments.path);
-			const proposed = exactText(job.arguments.proposed, 20_000);
+			const proposed = exactText(job.arguments.proposed, CALL_NOTE_LIMIT);
 			if (!path || proposed === null) return fail('invalid arguments');
 			const current = await surface.read(path);
 			if (current === null) return fail('That note is not available.');
-			if (current.length > 20_000) return fail('That note is too long to preview on a call.');
+			if (current.length > CALL_NOTE_LIMIT) {
+				return fail('That note is too long to change on a call. Edit it in Obsidian.');
+			}
 			const warnings = assessProposal(current, proposed);
 			return ok({
 				path,
@@ -88,15 +93,15 @@ export async function runVaultJob(
 		}
 		if (job.name === 'vault.apply') {
 			const path = vaultPath(job.arguments.path);
-			const original = exactText(job.arguments.original, 20_000);
-			const proposed = exactText(job.arguments.proposed, 20_000);
+			const original = exactText(job.arguments.original, CALL_NOTE_LIMIT);
+			const proposed = exactText(job.arguments.proposed, CALL_NOTE_LIMIT);
 			if (!path || original === null || proposed === null) return fail('invalid arguments');
 			const current = await surface.read(path);
 			if (current === null) return fail('That note is not available.');
 			if (current === proposed) return ok({ written: true, path, unchanged: true });
 			const decision = decideReplacement(current, original, proposed);
 			if (!decision.ok) return fail(decision.reason);
-			await surface.write(path, decision.next);
+			await surface.write(path, decision.next, current);
 			return ok({ written: true, path });
 		}
 		return fail('unknown tool');
@@ -213,9 +218,10 @@ function exactText(value: unknown, max: number): string | null {
 	return value;
 }
 
-function shorten(text: string, max: number): string {
-	if (text.length <= max) return text;
-	return `${text.slice(0, max)}\n\n[The rest of the note was left out.]`;
+function noteForCall(text: string): string {
+	if (text.length <= CALL_NOTE_LIMIT) return text;
+	const excerpt = text.slice(0, 1_200);
+	return `${excerpt}\n\n[The rest of this ${text.length}-character note was left out. It is too long to change on a call.]`;
 }
 
 function ok(result: unknown): BridgeResult {

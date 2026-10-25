@@ -16,13 +16,38 @@ export interface VectorIndex {
 	chunks: StoredChunk[];
 	embeddings: 'local' | 'provider';
 	embeddingModel: string;
+	/** Unchanged notes that did not fit. They are not embedded again until a seat opens. */
+	omitted: Record<string, string>;
+	/** True after a finished index update, including one that stored no passages. */
+	ready: boolean;
 }
 
 export const MAX_CHUNKS = 2_000;
 export const MAX_CHUNK_CHARS = 800;
 
 export function emptyIndex(): VectorIndex {
-	return { files: {}, chunks: [], embeddings: 'local', embeddingModel: '' };
+	return { files: {}, chunks: [], embeddings: 'local', embeddingModel: '', omitted: {}, ready: false };
+}
+
+/** True when this index was built for the embedding mode the user has now. */
+export function indexMatchesMode(
+	index: VectorIndex,
+	mode: { embeddings: 'local' | 'provider'; model: string },
+): boolean {
+	if (index.chunks.length === 0 && !index.ready) return false;
+	if (index.embeddings !== mode.embeddings) return false;
+	if (mode.embeddings === 'provider' && index.embeddingModel !== mode.model) return false;
+	return true;
+}
+
+/** Why Ask should stop before searching. Null when this index can be used. */
+export function indexUnavailableReason(
+	index: VectorIndex,
+	mode: { embeddings: 'local' | 'provider'; model: string },
+): string | null {
+	if (!indexMatchesMode(index, mode)) return 'Update the vault index first.';
+	if (index.chunks.length === 0) return 'The index has no passages yet.';
+	return null;
 }
 
 export function fileHash(text: string): string {
@@ -59,26 +84,53 @@ export function chunkNote(path: string, title: string, text: string): Chunk[] {
 
 export function planReindex(
 	existing: VectorIndex,
-	files: readonly { path: string; title: string; text: string; eligible: boolean }[],
+	files: readonly {
+		path: string;
+		title: string;
+		text: string;
+		eligible: boolean;
+		mtime?: number;
+	}[],
 	mode: { embeddings: 'local' | 'provider'; model: string },
-): { kept: StoredChunk[]; embed: Chunk[]; hashes: Record<string, string> } {
+): {
+	kept: StoredChunk[];
+	embed: Chunk[];
+	hashes: Record<string, string>;
+	omitted: Record<string, string>;
+} {
 	const hashes: Record<string, string> = {};
 	const kept: StoredChunk[] = [];
 	const embed: Chunk[] = [];
+	const omitted: Record<string, string> = {};
 	const sameMode =
 		existing.embeddings === mode.embeddings &&
 		(mode.embeddings === 'local' || existing.embeddingModel === mode.model);
-	for (const file of files) {
+	const ordered = [...files].sort((left, right) => (right.mtime ?? 0) - (left.mtime ?? 0));
+	let claimed = 0;
+	for (const file of ordered) {
 		if (!file.eligible || indexDisabled(file.text)) continue;
 		const hash = fileHash(file.text);
 		hashes[file.path] = hash;
-		if (sameMode && existing.files[file.path] === hash) {
-			kept.push(...existing.chunks.filter((chunk) => chunk.path === file.path));
+		const prior = existing.chunks.filter((chunk) => chunk.path === file.path);
+		if (sameMode && existing.files[file.path] === hash && prior.length > 0) {
+			if (claimed + prior.length > MAX_CHUNKS) {
+				omitted[file.path] = hash;
+				continue;
+			}
+			kept.push(...prior);
+			claimed += prior.length;
 			continue;
 		}
-		embed.push(...chunkNote(file.path, file.title, file.text));
+		const fresh = chunkNote(file.path, file.title, file.text);
+		if (fresh.length === 0) continue;
+		if (claimed + fresh.length > MAX_CHUNKS) {
+			omitted[file.path] = hash;
+			continue;
+		}
+		embed.push(...fresh);
+		claimed += fresh.length;
 	}
-	return { kept, embed, hashes };
+	return { kept, embed, hashes, omitted };
 }
 
 export function assembleIndex(
@@ -86,6 +138,7 @@ export function assembleIndex(
 	embedded: readonly StoredChunk[],
 	hashes: Record<string, string>,
 	mode: { embeddings: 'local' | 'provider'; model: string },
+	alreadyOmitted: Record<string, string> = {},
 ): { index: VectorIndex; truncated: boolean } {
 	const all = [...kept, ...embedded];
 	const groups = new Map<string, StoredChunk[]>();
@@ -96,8 +149,14 @@ export function assembleIndex(
 	}
 	const chunks: StoredChunk[] = [];
 	const files: Record<string, string> = {};
+	const omitted: Record<string, string> = { ...alreadyOmitted };
 	for (const [path, group] of groups) {
-		if (chunks.length + group.length > MAX_CHUNKS) continue;
+		if (chunks.length + group.length > MAX_CHUNKS) {
+			const hash = hashes[path];
+			if (typeof hash === 'string') omitted[path] = hash;
+			continue;
+		}
+		delete omitted[path];
 		chunks.push(...group);
 		const hash = hashes[path];
 		if (typeof hash === 'string') files[path] = hash;
@@ -108,8 +167,10 @@ export function assembleIndex(
 			chunks,
 			embeddings: mode.embeddings,
 			embeddingModel: mode.embeddings === 'provider' ? mode.model : '',
+			omitted,
+			ready: true,
 		},
-		truncated: chunks.length < all.length,
+		truncated: chunks.length < all.length || Object.keys(omitted).length > 0,
 	};
 }
 
@@ -172,6 +233,8 @@ export function readIndex(value: unknown): VectorIndex {
 		chunks?: unknown;
 		embeddings?: unknown;
 		embeddingModel?: unknown;
+		omitted?: unknown;
+		ready?: unknown;
 	};
 	const files: Record<string, string> = {};
 	if (record.files && typeof record.files === 'object') {
@@ -205,7 +268,20 @@ export function readIndex(value: unknown): VectorIndex {
 	const embeddings = record.embeddings === 'provider' ? 'provider' : 'local';
 	const embeddingModel =
 		typeof record.embeddingModel === 'string' ? record.embeddingModel : '';
-	return { files, chunks, embeddings, embeddingModel };
+	const omitted: Record<string, string> = {};
+	if (record.omitted && typeof record.omitted === 'object') {
+		for (const [path, hash] of Object.entries(record.omitted)) {
+			if (typeof hash === 'string') omitted[path] = hash;
+		}
+	}
+	return {
+		files,
+		chunks,
+		embeddings,
+		embeddingModel,
+		omitted,
+		ready: record.ready === true || chunks.length > 0,
+	};
 }
 
 function normalize(vector: number[]): number[] {

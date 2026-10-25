@@ -43,7 +43,7 @@ export function callRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Call token',
-			desc: 'Shared with the board. Stored in plugin data on this device. It is not written into notes. Note text the call reads is sent to the voice model configured on the board.',
+			desc: 'Shared with the board. Stored on this device only. It is not written into notes or the synced vault. Note text the call reads is sent to the voice model configured on the board.',
 			render: (setting) => {
 				setting.addText((text) => {
 					text.inputEl.type = 'password';

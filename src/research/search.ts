@@ -141,9 +141,20 @@ async function searchSerpapi(
 }
 
 function searchFailure(detail: string, secrets: readonly string[]): string {
-	const clean = detail.replace(/\s+/g, ' ').trim().slice(0, 180);
-	if (!clean || revealsSensitiveText(clean, secrets)) return 'The search request failed.';
+	const clean = visibleSearchDetail(detail, secrets);
+	if (!clean) return 'The search request failed.';
 	return `The search request failed. ${clean}`;
+}
+
+function visibleSearchDetail(detail: string, secrets: readonly string[]): string {
+	const clean = detail
+		.replace(/https?:\/\/\S+/gi, '')
+		.replace(/api_key=[^\s&]+/gi, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, 180);
+	if (!clean || revealsSensitiveText(clean, secrets)) return '';
+	return clean;
 }
 
 function hitFrom(
@@ -216,8 +227,7 @@ function failure(status: number, body: string, secrets: readonly string[]): stri
 	} catch {
 		detail = '';
 	}
-	detail = detail.replace(/\s+/g, ' ').trim().slice(0, 180);
-	if (revealsSensitiveText(detail, secrets)) detail = '';
+	detail = visibleSearchDetail(detail, secrets);
 	if (detail) return `The search request failed (${status}). ${detail}`;
 	return `The search request failed (${status}).`;
 }

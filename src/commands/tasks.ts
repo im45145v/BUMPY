@@ -5,10 +5,20 @@ import { parseFolders } from '../linking/suggest';
 import type { CleanupEditor } from '../notes/editor-apply';
 import { selectionRange } from '../notes/editor-apply';
 import { obsidianHttp } from '../providers/obsidian-http';
-import { createGoogleEvent, listGoogleEvents, updateGoogleEvent } from '../tasks/google';
+import {
+	createGoogleEvent,
+	listGoogleEvents,
+	refreshGoogleAccessToken,
+	updateGoogleEvent,
+} from '../tasks/google';
 import { dueReminderKeys, reminderInstant } from '../tasks/calendar';
 import { obsidianDesktopReminder } from '../tasks/desktop-reminder';
-import { publishDesktopReminder, reminderKey, reminderNotice } from '../tasks/reminders';
+import {
+	pruneFiredReminders,
+	publishDesktopReminder,
+	reminderKey,
+	reminderNotice,
+} from '../tasks/reminders';
 import {
 	formatTaskLine,
 	parseTaskLine,
@@ -24,13 +34,14 @@ import {
 import { ProviderError } from '../providers/types';
 import { CalendarView, CALENDAR_VIEW } from '../ui/calendar-view';
 import { TaskCaptureModal } from '../ui/task-modal';
-import { readMarkdownNotes } from '../vault/notes';
+import { readTaskNotes } from '../vault/notes';
 import { updatePluginData } from '../vault/plugin-data';
 
 export interface TaskHost extends CleanupHost {
 	firedReminders: Set<string>;
 	loadData(): Promise<unknown>;
 	saveData(data: unknown): Promise<void>;
+	saveSettings(): Promise<void>;
 }
 
 export function registerTaskFeatures(
@@ -73,7 +84,7 @@ export function registerTaskFeatures(
 }
 
 async function remind(plugin: TaskHost): Promise<void> {
-	const notes = await readMarkdownNotes(
+	const { notes, unread } = await readTaskNotes(
 		plugin.app,
 		parseFolders(plugin.settings.excludedFolders),
 	);
@@ -95,11 +106,9 @@ async function remind(plugin: TaskHost): Promise<void> {
 	);
 	const live = new Set(items.map((item) => item.key));
 	let changed = false;
-	for (const key of plugin.firedReminders) {
-		if (!live.has(key)) {
-			plugin.firedReminders.delete(key);
-			changed = true;
-		}
+	for (const key of pruneFiredReminders(plugin.firedReminders, live, new Set(unread))) {
+		plugin.firedReminders.delete(key);
+		changed = true;
 	}
 	for (const key of dueReminderKeys(items, Date.now(), plugin.firedReminders)) {
 		plugin.firedReminders.add(key);
@@ -117,16 +126,18 @@ async function remind(plugin: TaskHost): Promise<void> {
 }
 
 async function syncCalendar(plugin: TaskHost): Promise<void> {
-	const token = plugin.settings.googleAccessToken.trim();
 	const calendarId = plugin.settings.googleCalendarId.trim();
-	if (token === '' || calendarId === '') {
-		new Notice('Add a Google calendar access token and calendar ID in settings.');
+	if (calendarId === '' || !googleReady(plugin)) {
+		new Notice(
+			'Add a Google calendar ID and an access token in settings. A refresh token can renew the access token when you sync.',
+		);
 		return;
 	}
 	const controller = plugin.requests.start();
 	const notice = new Notice('Checking calendar…', 0);
 	try {
-		const notes = await readMarkdownNotes(
+		const token = await accessTokenForSync(plugin, controller.signal);
+		const { notes } = await readTaskNotes(
 			plugin.app,
 			parseFolders(plugin.settings.excludedFolders),
 		);
@@ -178,7 +189,11 @@ async function syncCalendar(plugin: TaskHost): Promise<void> {
 
 class SyncModal extends Modal {
 	private readonly choices = new Map<string, 'note' | 'calendar'>();
+	private readonly done = new Set<string>();
+	private links: SyncLink[];
+	private linksNeedSave = false;
 	private applying = false;
+	private applyButton: ButtonComponent | null = null;
 
 	constructor(
 		private readonly plugin: TaskHost,
@@ -191,9 +206,10 @@ class SyncModal extends Modal {
 		}>,
 		private readonly token: string,
 		private readonly calendarId: string,
-		private readonly links: SyncLink[],
+		links: SyncLink[],
 	) {
 		super(plugin.app);
+		this.links = [...links];
 	}
 
 	onOpen(): void {
@@ -240,37 +256,44 @@ class SyncModal extends Modal {
 		}
 		const actions = contentEl.createDiv({ cls: 'bumpy-preview-actions' });
 		new ButtonComponent(actions).setButtonText('Discard').onClick(() => this.close());
-		const apply = new ButtonComponent(actions)
+		this.applyButton = new ButtonComponent(actions)
 			.setButtonText('Apply')
 			.setCta()
 			.onClick(() => {
 				if (this.applying) return;
 				this.applying = true;
-				apply.setDisabled(true);
+				this.applyButton?.setDisabled(true);
 				void this.apply();
 			});
 	}
 
 	onClose(): void {
 		this.contentEl.empty();
+		if (!this.linksNeedSave || this.applying) return;
+		const links = this.links;
+		this.linksNeedSave = false;
+		void saveLinks(this.plugin, links).catch(() => {
+			this.linksNeedSave = true;
+			new Notice(
+				'The calendar link was not saved. The next sync may create that event again.',
+			);
+		});
 	}
 
 	private async apply(): Promise<void> {
 		const nextLinks = [...this.links];
+		let stopped = '';
 		try {
 			for (const action of this.resolved()) {
-				if (
-					action.type === 'unchanged' ||
-					action.type === 'absent-event'
-				) {
-					continue;
-				}
+				if (this.done.has(action.taskKey)) continue;
+				if (action.type === 'unchanged' || action.type === 'absent-event') continue;
 				if (action.type === 'conflict') {
 					new Notice('A calendar conflict was skipped because it has no choice.');
 					continue;
 				}
 				if (action.type === 'remember') {
 					upsertLink(nextLinks, action);
+					this.done.add(action.taskKey);
 					continue;
 				}
 				if (action.type === 'create-event') {
@@ -287,16 +310,14 @@ class SyncModal extends Modal {
 						date: action.date,
 						time: action.time,
 					});
-					const wrote = await writeTaskEvent(
-						this.plugin,
-						this.located,
-						action.taskKey,
-						{ eventId: created.id },
-					);
+					this.done.add(action.taskKey);
+					const wrote = await writeTaskEvent(this.plugin, this.located, action.taskKey, {
+						eventId: created.id,
+					});
 					if (!wrote) {
-						new Notice(
-							'The calendar event was created, but the task line had changed so the note was not updated.',
-						);
+						stopped =
+							'The calendar event was created, but the task line had changed, so the note was not updated.';
+						break;
 					}
 					continue;
 				}
@@ -314,6 +335,7 @@ class SyncModal extends Modal {
 						date: action.date,
 						time: action.time,
 					});
+					this.done.add(action.taskKey);
 					continue;
 				}
 				const wrote = await writeTaskEvent(this.plugin, this.located, action.taskKey, {
@@ -323,8 +345,8 @@ class SyncModal extends Modal {
 					eventId: action.eventId,
 				});
 				if (!wrote) {
-					new Notice('The task line changed, so the note was left unchanged.');
-					continue;
+					stopped = 'The task line changed, so the note was left unchanged.';
+					break;
 				}
 				upsertLink(nextLinks, {
 					taskKey: action.taskKey,
@@ -333,16 +355,27 @@ class SyncModal extends Modal {
 					date: action.date,
 					time: action.time,
 				});
+				this.done.add(action.taskKey);
 			}
 		} catch (error) {
-			const message =
-				error instanceof ProviderError ? error.message : 'Calendar sync failed.';
-			new Notice(message);
+			stopped = error instanceof ProviderError ? error.message : 'Calendar sync failed.';
 		}
+		this.links = nextLinks;
 		try {
 			await saveLinks(this.plugin, nextLinks);
+			this.linksNeedSave = false;
 		} catch {
-			new Notice('Could not save the calendar links.');
+			this.linksNeedSave = true;
+			const reason = stopped ? `${stopped} ` : '';
+			new Notice(`${reason}Could not save the calendar links. The review is still open.`);
+			this.applying = false;
+			this.applyButton?.setDisabled(false);
+			return;
+		}
+		if (stopped) {
+			new Notice(`${stopped} The review is still open.`);
+			this.applying = false;
+			this.applyButton?.setDisabled(false);
 			return;
 		}
 		this.close();
@@ -355,6 +388,42 @@ class SyncModal extends Modal {
 			return choice ? chooseConflict(action, choice) : action;
 		});
 	}
+}
+
+function googleReady(plugin: TaskHost): boolean {
+	if (plugin.settings.googleAccessToken.trim() !== '') return true;
+	return (
+		plugin.settings.googleClientId.trim() !== '' &&
+		plugin.settings.googleClientSecret.trim() !== '' &&
+		plugin.settings.googleRefreshToken.trim() !== ''
+	);
+}
+
+async function accessTokenForSync(plugin: TaskHost, signal: AbortSignal): Promise<string> {
+	const clientId = plugin.settings.googleClientId.trim();
+	const secret = plugin.settings.googleClientSecret.trim();
+	const refresh = plugin.settings.googleRefreshToken.trim();
+	if (clientId !== '' && secret !== '' && refresh !== '') {
+		const access = await refreshGoogleAccessToken(
+			obsidianHttp,
+			clientId,
+			secret,
+			refresh,
+			signal,
+		);
+		if (access !== plugin.settings.googleAccessToken) {
+			plugin.settings.googleAccessToken = access;
+			await plugin.saveSettings();
+		}
+		return access;
+	}
+	const token = plugin.settings.googleAccessToken.trim();
+	if (token === '') {
+		throw new ProviderError(
+			'Add a Google access token, or a client ID, client secret, and refresh token, in settings.',
+		);
+	}
+	return token;
 }
 
 function when(date: string, time: string | null): string {

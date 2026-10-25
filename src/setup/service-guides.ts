@@ -133,7 +133,7 @@ export const SEARCH_GUIDES: readonly SetupGuide[] = [
 		id: 'brave',
 		title: 'Brave search',
 		group: 'Search and calendar',
-		summary: 'Brave Search API. The key is stored in plugin data and sent as a header. Research cites only URLs Brave returns.',
+		summary: 'Brave Search API. The key stays on this device and is sent as a header. Research cites only URLs Brave returns.',
 		steps: [
 			'Create an API key on the [Brave key page](https://api.search.brave.com/app/keys).',
 			'In **Settings → Bumpy**, set **Web search** to **Brave**.',
@@ -160,7 +160,7 @@ export const SEARCH_GUIDES: readonly SetupGuide[] = [
 		title: 'Tavily',
 		group: 'Search and calendar',
 		summary:
-			'Tavily search. The key is stored in plugin data and sent as a bearer token. The topic is the query, and each search is a basic search.',
+			'Tavily search. The key stays on this device and is sent as a bearer token. The topic is the query, and each search is a basic search.',
 		steps: [
 			'Create an API key at [Tavily](https://app.tavily.com).',
 			'In **Settings → Bumpy**, set **Web search** to **Tavily**.',
@@ -187,7 +187,7 @@ export const SEARCH_GUIDES: readonly SetupGuide[] = [
 		title: 'SerpAPI',
 		group: 'Search and calendar',
 		summary:
-			'SerpAPI Google results. The key is stored in plugin data and sent as the api_key query parameter. The topic is the query. Research cites only links in the organic results. The request asks SerpAPI for those results only.',
+			'SerpAPI Google results. The key stays on this device. SerpAPI requires it as the api_key query parameter, and a failed search does not repeat that URL. The topic is the query. Research cites only links in the organic results. The request asks SerpAPI for those results only.',
 		steps: [
 			'Create an API key on the [SerpAPI key page](https://serpapi.com/manage-api-key).',
 			'In **Settings → Bumpy**, set **Web search** to **SerpAPI**.',
@@ -218,7 +218,7 @@ export const SEARCH_GUIDES: readonly SetupGuide[] = [
 		steps: [
 			'In Google Cloud, enable the Google Calendar API and create an OAuth client.',
 			'Open the [OAuth playground](https://developers.google.com/oauthplayground/) and authorize the scope `https://www.googleapis.com/auth/calendar`.',
-			'Paste the access token into **Google access token**. It stays in plugin data and is not written into notes.',
+			'Paste the access token into **Google access token**. It stays on this device and is not written into notes. Add a client ID, client secret, and refresh token if you want sync to renew it.',
 			'Set **Google calendar ID**. The usual id is `primary`.',
 			'Run **Sync calendar**. When the token expires, paste a new one.',
 			'A task with a time becomes a 30-minute event in the local time zone. A task with only a date stays an all-day event. Events Bumpy did not create are left alone.',

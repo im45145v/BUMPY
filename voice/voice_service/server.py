@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ssl
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
@@ -29,6 +30,8 @@ class QuietHandler(BaseHTTPRequestHandler):
         headers = {key.lower(): value for key, value in self.headers.items()}
         app: App = self.server.app  # type: ignore[attr-defined]
         response = app.dispatch(self.command, path, headers, body, self.surface)
+        if response.status == 401:
+            time.sleep(0.5)
         self.reply(response.status, response.body, response.content_type)
 
     def reply(self, status: int, body: bytes, content_type: str) -> None:

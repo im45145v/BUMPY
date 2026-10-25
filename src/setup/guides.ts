@@ -2,7 +2,7 @@ import { SETUP_GROUPS, type SetupGroup, type SetupGuide } from './apply';
 import { LOCAL_GUIDES } from './local-guides';
 import { CHAT_GUIDES, SEARCH_GUIDES, SPEECH_GUIDES } from './service-guides';
 
-const SHARED_INTRO = `A local server has to be running on the same computer as this copy of Obsidian. Note text is sent only when you run a command, and only to the provider that command uses. Keys stay in this vault's plugin data on this device and are not written into notes.
+const SHARED_INTRO = `A local server has to be running on the same computer as this copy of Obsidian. Note text is sent only when you run a command, and only to the provider that command uses. Keys stay on this device. They are not written into notes or the synced vault.
 
 The provider at the top of **Settings → Bumpy** is the default. Cleanup, vault answers, research, and embeddings can each use a different provider under **Feature providers**. Speech keeps its own keys.`;
 

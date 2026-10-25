@@ -8,6 +8,8 @@ import {
 	fileHash,
 	hashEmbed,
 	indexDisabled,
+	indexMatchesMode,
+	indexUnavailableReason,
 	planReindex,
 	readIndex,
 	retrievableChunks,
@@ -145,6 +147,69 @@ describe('vault index', () => {
 		expect(overflow.truncated).toBe(true);
 		expect(overflow.index.files).toEqual({ 'Full.md': 'full' });
 		expect(overflow.index.chunks.every((chunk) => chunk.path === 'Full.md')).toBe(true);
+	});
+
+	it('asks for a new index when the embedding model changes', () => {
+		const index = emptyIndex();
+		index.chunks.push({
+			path: 'Garden.md',
+			title: 'Garden',
+			heading: 'Garden',
+			text: note.text,
+			vector: [1],
+		});
+		index.embeddings = 'provider';
+		index.embeddingModel = 'nomic\nhttp://127.0.0.1:11434/v1';
+		expect(indexMatchesMode(index, { embeddings: 'provider', model: index.embeddingModel })).toBe(
+			true,
+		);
+		expect(
+			indexMatchesMode(index, { embeddings: 'provider', model: 'other\nhttp://127.0.0.1:11434/v1' }),
+		).toBe(false);
+		expect(indexMatchesMode(index, { embeddings: 'local', model: '' })).toBe(false);
+		const built = assembleIndex([], [], {}, { embeddings: 'local', model: '' }).index;
+		expect(indexMatchesMode(built, { embeddings: 'local', model: '' })).toBe(true);
+		expect(indexUnavailableReason(built, { embeddings: 'local', model: '' })).toBe(
+			'The index has no passages yet.',
+		);
+		expect(indexUnavailableReason(emptyIndex(), { embeddings: 'local', model: '' })).toBe(
+			'Update the vault index first.',
+		);
+	});
+
+	it('keeps a newer note and does not embed an unchanged note that still does not fit', () => {
+		const newer = {
+			path: 'New.md',
+			title: 'New',
+			text: 'n'.repeat(2000 * 800),
+			eligible: true,
+			mtime: 20,
+		};
+		const older = {
+			path: 'Old.md',
+			title: 'Old',
+			text: 'older note about rent',
+			eligible: true,
+			mtime: 1,
+		};
+		const mode = { embeddings: 'local' as const, model: '' };
+		const first = planReindex(emptyIndex(), [older, newer], mode);
+		expect(first.embed.some((chunk) => chunk.path === 'Old.md')).toBe(false);
+		expect(first.omitted['Old.md']).toBe(fileHash(older.text));
+		expect(first.embed[0]?.path).toBe('New.md');
+		const saved = assembleIndex(
+			first.kept,
+			first.embed.map((chunk) => ({ ...chunk, vector: [1] })),
+			first.hashes,
+			mode,
+			first.omitted,
+		).index;
+		const again = planReindex(saved, [older, newer], mode);
+		expect(again.embed).toEqual([]);
+		expect(again.kept[0]?.path).toBe('New.md');
+		expect(again.omitted['Old.md']).toBe(fileHash(older.text));
+		const room = planReindex(saved, [older], mode);
+		expect(room.embed.map((chunk) => chunk.path)).toEqual(['Old.md']);
 	});
 
 	it('indexes a leading rule and still skips YAML frontmatter', () => {

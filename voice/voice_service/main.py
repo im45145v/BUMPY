@@ -23,6 +23,11 @@ def main() -> None:
     start(bridge)
     print(f"Call: https://{config.host}:{config.https_port}", flush=True)
     print(f"Bridge: https://{config.host}:{config.bridge_port}", flush=True)
+    if config.host in {"0.0.0.0", "::"}:
+        print(
+            "This board is open to the network. Set VOICE_HOST=127.0.0.1 to keep it on this computer.",
+            flush=True,
+        )
     try:
         threading.Event().wait()
     except KeyboardInterrupt:

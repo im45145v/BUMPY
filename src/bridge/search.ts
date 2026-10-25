@@ -7,19 +7,17 @@ import {
 
 export async function passagesForQuestion(
 	index: VectorIndex,
-	embeddings: 'local' | 'provider',
 	excluded: readonly string[],
 	exists: (path: string) => boolean,
 	question: string,
 	embedQuery: (question: string) => Promise<number[]>,
 ): Promise<string> {
-	if (index.chunks.length === 0 || index.embeddings !== embeddings) {
-		throw new Error('Update the vault index first.');
-	}
 	const chunks = retrievableChunks(index.chunks, excluded, exists);
 	if (chunks.length === 0) {
 		throw new Error(
-			'The indexed notes are excluded or no longer in the vault. Update the vault index.',
+			index.chunks.length === 0
+				? 'The index has no passages yet.'
+				: 'The indexed notes are excluded or no longer in the vault. Update the vault index.',
 		);
 	}
 	const query = await embedQuery(question);

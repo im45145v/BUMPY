@@ -85,7 +85,10 @@ class App:
         if surface == "call" and method == "GET" and path == "/call/caption":
             return json_response(200, {"text": self.caption.get()})
         if method == "GET" and path == "/bridge/jobs":
-            return json_response(200, {"job": self.bridge.next_job()})
+            return json_response(
+                200,
+                {"job": self.bridge.next_job(), "preview": self.conversation.tools.has_pending()},
+            )
         if method == "POST" and path == "/bridge/preview/drop":
             self.conversation.tools.drop_pending()
             return json_response(200, {"ok": True})

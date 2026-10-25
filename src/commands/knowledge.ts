@@ -7,6 +7,7 @@ import { registerResearchCommands } from './research';
 export interface DataHost extends CleanupHost {
 	loadData(): Promise<unknown>;
 	saveData(data: unknown): Promise<void>;
+	manifest: { dir?: string };
 }
 
 export function registerKnowledge(

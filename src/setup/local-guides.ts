@@ -148,7 +148,7 @@ export const LOCAL_GUIDES: readonly SetupGuide[] = [
 		title: 'Local hashing',
 		group: 'Local',
 		summary:
-			'Vault answers can stay on this computer with no model download. Matching uses shared words. Passages are stored in plugin data, not in the note.',
+			'Vault answers can stay on this computer with no model download. Matching uses shared words. Passages are stored next to the plugin, not in the note.',
 		steps: [
 			'In **Settings → Bumpy**, set **Embeddings** to **Local hashing**.',
 			'Run **Update vault index**, then **Ask the vault**.',

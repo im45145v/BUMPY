@@ -282,7 +282,7 @@ const PROVIDER_URL_DESC =
 	'OpenAI-compatible providers, including Anthropic, Gemini, Groq, OpenRouter, Mistral, DeepSeek, and xAI, use this base URL. Backboard uses its own API. Leave the API key empty for a local server that does not require one.';
 
 const API_KEY_DESC =
-	"Stored in this vault's plugin data on this device. It is not written into notes.";
+	'Stored on this device only. It is not written into notes or the synced vault.';
 
 interface TextControlDefinition {
 	name: string;

@@ -2,7 +2,7 @@
 
 These are the steps for each model Bumpy can use. In Obsidian, open the command palette and run **Open setup**, or select **Open setup** at the top of **Settings → Bumpy**. Buttons on that page fill the settings. When Ollama is already running, a button can ask it to download a model.
 
-A local server has to be running on the same computer as this copy of Obsidian. Note text is sent only when you run a command, and only to the provider that command uses. Keys stay in this vault's plugin data on this device and are not written into notes.
+A local server has to be running on the same computer as this copy of Obsidian. Note text is sent only when you run a command, and only to the provider that command uses. Keys stay on this device. They are not written into notes or the synced vault.
 
 The provider at the top of **Settings → Bumpy** is the default. Cleanup, vault answers, research, and embeddings can each use a different provider under **Feature providers**. Speech keeps its own keys.
 
@@ -61,7 +61,7 @@ On the setup page:
 
 ### Local hashing
 
-Vault answers can stay on this computer with no model download. Matching uses shared words. Passages are stored in plugin data, not in the note.
+Vault answers can stay on this computer with no model download. Matching uses shared words. Passages are stored next to the plugin, not in the note.
 
 1. In **Settings → Bumpy**, set **Embeddings** to **Local hashing**.
 2. Run **Update vault index**, then **Ask the vault**.
@@ -362,7 +362,7 @@ Web search stays off until you choose a provider. SearXNG is under Local. Calend
 
 ### Brave search
 
-Brave Search API. The key is stored in plugin data and sent as a header. Research cites only URLs Brave returns.
+Brave Search API. The key stays on this device and is sent as a header. Research cites only URLs Brave returns.
 
 1. Create an API key on the [Brave key page](https://api.search.brave.com/app/keys).
 2. In **Settings → Bumpy**, set **Web search** to **Brave**.
@@ -375,7 +375,7 @@ On the setup page:
 
 ### Tavily
 
-Tavily search. The key is stored in plugin data and sent as a bearer token. The topic is the query, and each search is a basic search.
+Tavily search. The key stays on this device and is sent as a bearer token. The topic is the query, and each search is a basic search.
 
 1. Create an API key at [Tavily](https://app.tavily.com).
 2. In **Settings → Bumpy**, set **Web search** to **Tavily**.
@@ -388,7 +388,7 @@ On the setup page:
 
 ### SerpAPI
 
-SerpAPI Google results. The key is stored in plugin data and sent as the api_key query parameter. The topic is the query. Research cites only links in the organic results. The request asks SerpAPI for those results only.
+SerpAPI Google results. The key stays on this device. SerpAPI requires it as the api_key query parameter, and a failed search does not repeat that URL. The topic is the query. Research cites only links in the organic results. The request asks SerpAPI for those results only.
 
 1. Create an API key on the [SerpAPI key page](https://serpapi.com/manage-api-key).
 2. In **Settings → Bumpy**, set **Web search** to **SerpAPI**.
@@ -405,7 +405,7 @@ Sync compares dated tasks with a Google calendar. Nothing is synced until a cale
 
 1. In Google Cloud, enable the Google Calendar API and create an OAuth client.
 2. Open the [OAuth playground](https://developers.google.com/oauthplayground/) and authorize the scope `https://www.googleapis.com/auth/calendar`.
-3. Paste the access token into **Google access token**. It stays in plugin data and is not written into notes.
+3. Paste the access token into **Google access token**. It stays on this device and is not written into notes. Add a client ID, client secret, and refresh token if you want sync to renew it.
 4. Set **Google calendar ID**. The usual id is `primary`.
 5. Run **Sync calendar**. When the token expires, paste a new one.
 6. A task with a time becomes a 30-minute event in the local time zone. A task with only a date stays an all-day event. Events Bumpy did not create are left alone.

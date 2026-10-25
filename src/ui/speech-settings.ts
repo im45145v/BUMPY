@@ -23,7 +23,7 @@ import { ProviderError } from '../providers/types';
 import type { SettingsOwner } from '../settings';
 
 const KEY_DESC =
-	"Stored in this vault's plugin data on this device. It is not written into notes.";
+	'Stored on this device only. It is not written into notes or the synced vault.';
 
 export function renderSpeechSettings(
 	containerEl: HTMLElement,

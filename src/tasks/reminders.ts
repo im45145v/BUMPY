@@ -1,3 +1,28 @@
+/** The note path stored at the front of a reminder key. */
+export function reminderNotePath(key: string): string | null {
+	const match = /^(.*):\d{4}-\d{2}-\d{2}:/.exec(key);
+	return match?.[1] ?? null;
+}
+
+/**
+ * Drops reminders whose tasks are gone.
+ * A note that could not be read keeps its reminder so a failed scan does not notify again.
+ */
+export function pruneFiredReminders(
+	fired: ReadonlySet<string>,
+	live: ReadonlySet<string>,
+	unread: ReadonlySet<string>,
+): string[] {
+	const removed: string[] = [];
+	for (const key of fired) {
+		if (live.has(key)) continue;
+		const path = reminderNotePath(key);
+		if (path && unread.has(path)) continue;
+		removed.push(key);
+	}
+	return removed;
+}
+
 export function reminderKey(
 	path: string,
 	task: { due: string; time: string | null; title: string },

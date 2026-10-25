@@ -67,7 +67,7 @@ export function knowledgeRows(owner: SettingsOwner): Array<{
 		},
 		{
 			name: 'Search API key',
-			desc: "Stored in this vault's plugin data on this device. Brave, Tavily, and SerpAPI use it. It is not written into notes.",
+			desc: 'Stored on this device only. It is not written into notes or the synced vault. SerpAPI has to send it in the request URL, and that URL is not shown if the search fails.',
 			render: (setting) => addSecret(setting, owner),
 		},
 		{

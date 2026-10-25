@@ -11,38 +11,57 @@ interface PreviewHost {
 	settings: BumpySettings;
 }
 
+interface OpenPreview {
+	generation: number;
+	close: () => void;
+}
+
+let generation = 0;
+let current: OpenPreview | null = null;
+
+/** Closes the Obsidian preview when the call no longer has one. */
+export function closeCallPreview(): void {
+	const open = current;
+	current = null;
+	open?.close();
+}
+
 export function openCallPreview(
 	plugin: PreviewHost,
 	preview: CallPreview,
-	write: (path: string, text: string) => Promise<void>,
+	write: (path: string, text: string, expected?: string) => Promise<void>,
 	read: (path: string) => Promise<string | null>,
 ): void {
+	const mine = ++generation;
+	const previous = current;
+	current = null;
+	previous?.close();
 	let wrote = false;
-	new CleanupPreviewModal(plugin.app, {
+	const modal = new CleanupPreviewModal(plugin.app, {
 		title: 'Review call change',
 		original: preview.original,
 		proposed: preview.proposed,
 		warnings: preview.warnings,
-		note: 'This replaces the whole note. Nothing is written until you apply it here, or say apply on the call.',
+		note: 'This replaces the whole note. Say apply to write it, or discard to cancel. Nothing is written until you do.',
 		onApply: async () => {
 			try {
-				const current = await read(preview.path);
-				if (current === null) {
+				const note = await read(preview.path);
+				if (note === null) {
 					new Notice('That note is not available.');
 					return false;
 				}
-				if (current === preview.proposed) {
+				if (note === preview.proposed) {
 					wrote = true;
 					await releaseCallPreview(plugin);
 					new Notice('That note already has this text.');
 					return true;
 				}
-				const decision = decideReplacement(current, preview.original, preview.proposed);
+				const decision = decideReplacement(note, preview.original, preview.proposed);
 				if (!decision.ok) {
 					new Notice(decision.reason);
 					return false;
 				}
-				await write(preview.path, decision.next);
+				await write(preview.path, decision.next, note);
 				wrote = true;
 				await releaseCallPreview(plugin);
 				return true;
@@ -53,9 +72,13 @@ export function openCallPreview(
 			}
 		},
 		onDismiss: () => {
-			if (!wrote) void releaseCallPreview(plugin);
+			const stillCurrent = current?.generation === mine;
+			if (stillCurrent) current = null;
+			if (!wrote && stillCurrent) void releaseCallPreview(plugin);
 		},
-	}).open();
+	});
+	current = { generation: mine, close: () => modal.close() };
+	modal.open();
 }
 
 async function releaseCallPreview(plugin: PreviewHost): Promise<void> {

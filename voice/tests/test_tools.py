@@ -11,7 +11,7 @@ import pytest
 from voice_service.bridge_queue import JobQueue
 from voice_service.files import FileSandbox, ToolError
 from voice_service.playback import Playback, TurnGate, barge_in
-from voice_service.tools import ToolTable, agrees
+from voice_service.tools import ToolTable, agrees, discards
 from voice_service.vad import EnergyVad
 from voice_service.wav import resample, tone_wav
 
@@ -67,7 +67,8 @@ def test_files_stay_in_the_folder_and_scripts_have_no_shell(tmp_path: Path) -> N
     with pytest.raises(ToolError, match="outside"):
         sandbox.read_file("link.txt")
     assert sandbox.run_script("ping", "once") == "pong"
-    assert seen[0][0] == ["python3", "ping.py", "once"]
+    assert seen[0][0] == ["python3", "ping.py"]
+    assert seen[0][1]["env"]["BUMPY_ARGUMENT"] == "once"
     assert seen[0][1]["shell"] is False
     assert seen[0][1]["cwd"] == str(root.resolve())
     with pytest.raises(ToolError, match="not allowed"):
@@ -92,12 +93,16 @@ def test_apply_waits_for_agreement_and_uses_the_preview() -> None:
     queue = JobQueue()
     tools = ToolTable(queue, FileSandbox(Path(), {}), timeout=2)
     assert agrees("apply")
+    assert agrees("apply please")
     assert agrees("Please write it.")
     assert agrees("apply anyway", warnings=True)
     assert not agrees("yes")
     assert not agrees("ok")
     assert not agrees("apply", warnings=True)
     assert not agrees("yes but change the date")
+    assert discards("discard")
+    assert discards("never mind")
+    assert not discards("apply")
     result: dict[str, object] = {}
 
     def worker() -> None:
@@ -136,3 +141,47 @@ def test_unconfirmed_apply_keeps_the_preview() -> None:
     tools.pending.store({"path": "Home.md", "original": "old", "proposed": "new"})
     assert "could not confirm" in tools.apply_pending(lambda: False)
     assert tools.has_pending() is True
+
+
+def _finish(queue: JobQueue, result: dict[str, object]) -> threading.Thread:
+    def worker() -> None:
+        job = None
+        for _ in range(50):
+            job = queue.next_job()
+            if job is not None:
+                break
+            time.sleep(0.02)
+        assert job is not None
+        queue.complete(job["id"], result)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    return thread
+
+
+def test_rejected_apply_keeps_the_preview() -> None:
+    queue = JobQueue()
+    tools = ToolTable(queue, FileSandbox(None, {}), timeout=2)
+    tools.pending.store({"path": "Home.md", "original": "old", "proposed": "new"})
+    thread = _finish(
+        queue,
+        {
+            "ok": False,
+            "error": "This note changed while the preview was open. Discard it and try again.",
+        },
+    )
+    message = tools.apply_pending(lambda: False)
+    thread.join(timeout=3)
+    assert "changed" in message
+    assert tools.has_pending() is True
+
+
+def test_missing_note_drops_the_preview() -> None:
+    queue = JobQueue()
+    tools = ToolTable(queue, FileSandbox(None, {}), timeout=2)
+    tools.pending.store({"path": "Home.md", "original": "old", "proposed": "new"})
+    thread = _finish(queue, {"ok": False, "error": "That note is not available."})
+    message = tools.apply_pending(lambda: False)
+    thread.join(timeout=3)
+    assert message == "That note is not available."
+    assert tools.has_pending() is False
