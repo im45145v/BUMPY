@@ -1,20 +1,32 @@
 import { useState } from "react";
 import { films } from "./films";
 
+const localFilms = import.meta.env.BUMPY_LOCAL_FILMS;
+const localIds = Array.isArray(localFilms) ? localFilms : [];
+const availableFilms = films.filter((film) => film.youtube || localIds.includes(film.id));
+
 export const VideoShelf: React.FC = () => {
-	const [id, setId] = useState(films[0]?.id ?? "");
+	const [id, setId] = useState(availableFilms.find((film) => film.youtube)?.id ?? availableFilms[0]?.id ?? "");
 	const [missing, setMissing] = useState(false);
-	const film = films.find((item) => item.id === id) ?? films[0];
+	const film = availableFilms.find((item) => item.id === id) ?? availableFilms[0];
 
 	if (!film) return null;
 
 	return (
 		<div className="shelf">
 			<div className="film-frame">
-				{missing ? (
-					<p className="film-fallback">
-						This film is not in the build. The files live in <code>video/out</code>.
-					</p>
+				{film.youtube ? (
+					<iframe
+						key={film.id}
+						src={`https://www.youtube.com/embed/${film.youtube}`}
+						title={film.title}
+						loading="lazy"
+						allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+						allowFullScreen
+						referrerPolicy="strict-origin-when-cross-origin"
+					/>
+				) : missing ? (
+					<p className="film-fallback">This video could not load.</p>
 				) : (
 					<video
 						key={film.src}
@@ -29,13 +41,12 @@ export const VideoShelf: React.FC = () => {
 					</video>
 				)}
 			</div>
-			<div className="shelf-list" role="listbox" aria-label="Rendered films">
-				{films.map((item) => (
+			<div className="shelf-list" role="group" aria-label="Choose a film">
+				{availableFilms.map((item) => (
 					<button
 						key={item.id}
 						type="button"
-						role="option"
-						aria-selected={item.id === film.id}
+						aria-pressed={item.id === film.id}
 						className={item.id === film.id ? "shelf-item is-on" : "shelf-item"}
 						onClick={() => {
 							setMissing(false);

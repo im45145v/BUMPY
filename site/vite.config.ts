@@ -86,6 +86,11 @@ function videoFiles(): Plugin {
 
 export default defineConfig({
 	plugins: [react(), videoFiles()],
+	define: {
+		"import.meta.env.BUMPY_LOCAL_FILMS": JSON.stringify(
+			films.filter((film) => fs.existsSync(path.join(repoRoot, film.file))).map((film) => film.id),
+		),
+	},
 	server: {
 		host: "127.0.0.1",
 		port: 5173,

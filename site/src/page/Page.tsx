@@ -114,11 +114,9 @@ export const Page: React.FC = () => {
 				<section className="band" id="videos">
 					<div className="wrap">
 						<p className="kicker">Videos</p>
-						<h2>The rendered films.</h2>
+						<h2>Watch Bumpy in action.</h2>
 						<p className="section-lead">
-							These are the 1080p files from <code>video/out</code>. Maya is the Obsidian-styled
-							story. The launch film is the score cut. The hackathon demo is the narrated walkthrough.
-							Slow and steady is the short cut about the move.
+							The launch film and the narrated product demo play from YouTube.
 						</p>
 						<VideoShelf />
 					</div>
@@ -306,7 +304,7 @@ export const Page: React.FC = () => {
 						<p>
 							This page uses the same dark workspace, borders, and purple accent as Obsidian. The
 							plugin does not load web fonts. The pane beside the story embeds the launch video from YouTube.
-							The other videos are the rendered files.
+							The video shelf plays that film and the product demo from YouTube.
 						</p>
 					</div>
 				</div>

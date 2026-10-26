@@ -3,6 +3,7 @@ export type Film = {
 	readonly title: string;
 	readonly detail: string;
 	readonly length: string;
+	readonly youtube?: string;
 	readonly src: string;
 	readonly poster: string;
 	readonly file: string;
@@ -23,7 +24,8 @@ export const films: readonly Film[] = [
 	},
 	{
 		id: "launch",
-		title: "Put your thoughts in motion",
+		youtube: "hwy7td4Mmdg",
+		title: "BUMPY Launch Video",
 		detail:
 			"Launch film with an original score. The on-screen copy carries the story when the sound is off.",
 		length: "1:12",
@@ -34,6 +36,7 @@ export const films: readonly Film[] = [
 	},
 	{
 		id: "hackathon",
+		youtube: "ZgIda6qRDaE",
 		title: "Hackathon product demo",
 		detail:
 			"Narrated walkthrough of the plugin in Obsidian. The captures come from a synthetic vault, including local answers, cleanup, links, tasks, and the calendar.",

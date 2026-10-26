@@ -198,7 +198,7 @@ Automated tests cover the note logic and the provider clients with stand-in HTTP
 
 ## Site
 
-The public page lives in `site/`. It is a static site styled like Obsidian's dark workspace. The pane beside the story embeds the launch video from YouTube, and the other rendered films in `video/out` play from the Videos section when that folder is present.
+The public page lives in `site/`. It is a static site styled like Obsidian's dark workspace. The pane beside the story and the Videos section embed the launch film and the product demo from YouTube.
 
 ```bash
 npm install --prefix site
