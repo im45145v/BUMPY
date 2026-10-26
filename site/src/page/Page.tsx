@@ -305,7 +305,7 @@ export const Page: React.FC = () => {
 						</p>
 						<p>
 							This page uses the same dark workspace, borders, and purple accent as Obsidian. The
-							plugin does not load web fonts. The pane beside the story plays the latest story film.
+							plugin does not load web fonts. The pane beside the story embeds the launch video from YouTube.
 							The other videos are the rendered files.
 						</p>
 					</div>
