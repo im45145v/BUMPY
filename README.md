@@ -198,14 +198,14 @@ Automated tests cover the note logic and the provider clients with stand-in HTTP
 
 ## Site
 
-The public page lives in `site/`. It is a static site, and the film on it is a Remotion composition that plays in the browser.
+The public page lives in `site/`. It is a static site styled like Obsidian's dark workspace. A Remotion composition plays in the browser beside the story, and the rendered films in `video/out` play from the Videos section when that folder is present.
 
 ```bash
 npm install --prefix site
 npm run site
 ```
 
-`render.yaml` publishes that site on Render. Create a Blueprint from this repository. The build runs in `site/`, publishes `dist`, and Render serves the files from its CDN. There is no video file to encode and no server to keep awake.
+`render.yaml` publishes that site on Render. Create a Blueprint from this repository. The build runs in `site/`, publishes `dist`, and Render serves the files from its CDN. Rendered videos are copied into the build only when `video/out` is available. There is no server to keep awake.
 
 ## License
 

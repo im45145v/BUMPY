@@ -2,18 +2,22 @@ import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { amber, cream, ink, mono, paper, sans, serif } from "./theme";
 
-export const Mark: React.FC<{ size: number }> = ({ size }) => {
+export const Mark: React.FC<{ size: number; color?: string; glyph?: string }> = ({
+	size,
+	color = amber,
+	glyph = ink,
+}) => {
 	return (
 		<svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-			<rect width="64" height="64" rx="18" fill={amber} />
+			<rect width="64" height="64" rx="18" fill={color} />
 			<path
 				d="M12 42c7-16 13-20 20-20s13 4 20 20"
 				fill="none"
-				stroke={ink}
+				stroke={glyph}
 				strokeWidth="4.5"
 				strokeLinecap="round"
 			/>
-			<circle cx="32" cy="42" r="3.2" fill={ink} />
+			<circle cx="32" cy="42" r="3.2" fill={glyph} />
 		</svg>
 	);
 };

@@ -1,5 +1,5 @@
-# Static site. The Remotion film plays in the browser, so Render
-# publishes files to the CDN and does not run a video worker.
+# Static site. Render publishes site/dist to the CDN.
+# Rendered films are copied from video/out when those files are present.
 services:
   - type: web
     name: bumpy

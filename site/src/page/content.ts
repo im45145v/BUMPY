@@ -6,7 +6,7 @@ export const hero = {
 	titleEm: "notes.",
 	lede: "Bumpy is a local-first sidekick for Obsidian. The vault stays the source of truth, and notes stay ordinary Markdown. Proposed edits are shown first. Nothing is written until you apply or create the reviewed result.",
 	filmNote:
-		"The picture is a Remotion film. It plays in the browser while you read. Render hosts the page. There is no video file to stream.",
+		"The pane on the right is drawn in the browser and follows the section you are reading. The rendered films are under Videos.",
 };
 
 export const principles = [

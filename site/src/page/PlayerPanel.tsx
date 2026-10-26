@@ -114,7 +114,7 @@ export const PlayerPanel: React.FC<PlayerPanelProps> = ({ requestedId, onJump })
 	return (
 		<FilmBoundary>
 			<div className="player-panel" id="film">
-				<p className="kicker">Remotion, in the browser</p>
+				<p className="kicker">Live film</p>
 				<div className="film-frame">
 					<Player
 						ref={ref}

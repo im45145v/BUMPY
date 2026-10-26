@@ -4,6 +4,7 @@ import { CHAPTERS, type ChapterId } from "../film/chapters";
 import { Mark } from "../film/ui";
 import { CleanupDemo } from "./CleanupDemo";
 import { PlayerPanel } from "./PlayerPanel";
+import { VideoShelf } from "./VideoShelf";
 import {
 	chatProviders,
 	commandGroups,
@@ -20,12 +21,15 @@ import {
 
 const nav = [
 	["#film", "Film"],
+	["#videos", "Videos"],
 	["#commands", "Commands"],
 	["#speech", "Speech"],
 	["#providers", "Providers"],
 	["#details", "Details"],
 	["#setup", "Setup"],
 ] as const;
+
+const accent = "#8b5cf6";
 
 export const Page: React.FC = () => {
 	const [requestedId, setRequestedId] = useState<ChapterId>("opening");
@@ -65,23 +69,31 @@ export const Page: React.FC = () => {
 			<a className="skip" href="#story">
 				Skip to the story
 			</a>
-			<header className="nav">
-				<a className="brand" href="#top">
-					<Mark size={34} />
-					<span>Bumpy</span>
-				</a>
-				<nav aria-label="Page">
-					{nav.map(([href, label]) => (
-						<a key={href} href={href}>
-							{label}
+			<div className="workspace">
+				<aside className="sidebar">
+					<a className="brand" href="#top">
+						<Mark size={28} color={accent} glyph="#ffffff" />
+						<span>Bumpy</span>
+					</a>
+					<p className="sidebar-heading">On this page</p>
+					<nav aria-label="Page">
+						{nav.map(([href, label]) => (
+							<a key={href} href={href}>
+								{label}
+							</a>
+						))}
+					</nav>
+				</aside>
+				<div className="leaf">
+					<div className="tab-header">
+						<div className="workspace-tab mod-active">
+							<Mark size={16} color={accent} glyph="#ffffff" />
+							<span>BUMPY</span>
+						</div>
+						<a className="button primary" href={repoUrl}>
+							GitHub
 						</a>
-					))}
-				</nav>
-				<a className="button nav-repo" href={repoUrl}>
-					GitHub
-				</a>
-			</header>
-
+					</div>
 			<main id="top">
 				<div className="wrap reel">
 					<div className="reel-copy" id="story">
@@ -134,6 +146,19 @@ export const Page: React.FC = () => {
 						</div>
 					</aside>
 				</div>
+
+				<section className="band" id="videos">
+					<div className="wrap">
+						<p className="kicker">Videos</p>
+						<h2>The rendered films.</h2>
+						<p className="section-lead">
+							These are the 1080p files from <code>video/out</code>. Maya is the Obsidian-styled
+							story. The launch film is the score cut. The hackathon demo is the narrated walkthrough.
+							Slow and steady is the short cut about the move.
+						</p>
+						<VideoShelf />
+					</div>
+				</section>
 
 				<section className="band" id="commands">
 					<div className="wrap">
@@ -284,7 +309,7 @@ export const Page: React.FC = () => {
 				<div className="wrap footer-grid">
 					<div>
 						<a className="brand" href="#top">
-							<Mark size={34} />
+							<Mark size={28} color={accent} glyph="#ffffff" />
 							<span>Bumpy</span>
 						</a>
 						<p>
@@ -315,12 +340,15 @@ export const Page: React.FC = () => {
 							0BSD terms.
 						</p>
 						<p>
-							This page loads fonts from Google Fonts. The Bumpy plugin does not. The film is drawn
-							by Remotion in your browser. Render serves the files from its CDN.
+							This page uses the same dark workspace, borders, and purple accent as Obsidian. The
+							plugin does not load web fonts. The scrolling film is drawn in the browser. The videos
+							are the rendered files.
 						</p>
 					</div>
 				</div>
 			</footer>
+				</div>
+			</div>
 		</>
 	);
 };
