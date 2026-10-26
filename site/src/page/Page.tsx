@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import manifest from "../../../manifest.json";
-import { CHAPTERS, type ChapterId } from "../film/chapters";
+import { CHAPTERS } from "../film/chapters";
 import { Mark } from "../film/ui";
 import { CleanupDemo } from "./CleanupDemo";
 import { PlayerPanel } from "./PlayerPanel";
@@ -32,38 +31,6 @@ const nav = [
 const accent = "#8b5cf6";
 
 export const Page: React.FC = () => {
-	const [requestedId, setRequestedId] = useState<ChapterId>("opening");
-
-	useEffect(() => {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				const visible = entries
-					.filter((entry) => entry.isIntersecting)
-					.sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-				const id = visible?.target.getAttribute("data-chapter");
-				if (!id) return;
-				if (CHAPTERS.some((chapter) => chapter.id === id)) {
-					setRequestedId(id as ChapterId);
-				}
-			},
-			{
-				threshold: [0.35, 0.55, 0.75],
-				rootMargin: "-12% 0px -28% 0px",
-			},
-		);
-		for (const node of document.querySelectorAll("[data-chapter]")) {
-			observer.observe(node);
-		}
-		return () => observer.disconnect();
-	}, []);
-
-	function showScene(id: ChapterId) {
-		setRequestedId(id);
-		if (window.matchMedia("(max-width: 980px)").matches) {
-			document.getElementById("film")?.scrollIntoView({ behavior: "smooth", block: "start" });
-		}
-	}
-
 	return (
 		<>
 			<a className="skip" href="#story">
@@ -133,16 +100,13 @@ export const Page: React.FC = () => {
 										<p key={paragraph}>{paragraph}</p>
 									))}
 									{chapter.id === "preview" ? <CleanupDemo /> : null}
-									<button type="button" className="text-button" onClick={() => showScene(chapter.id)}>
-										Show this scene
-									</button>
 								</article>
 							);
 						})}
 					</div>
 					<aside className="reel-film">
 						<div className="reel-sticky">
-							<PlayerPanel requestedId={requestedId} onJump={setRequestedId} />
+							<PlayerPanel />
 						</div>
 					</aside>
 				</div>
@@ -341,8 +305,8 @@ export const Page: React.FC = () => {
 						</p>
 						<p>
 							This page uses the same dark workspace, borders, and purple accent as Obsidian. The
-							plugin does not load web fonts. The scrolling film is drawn in the browser. The videos
-							are the rendered files.
+							plugin does not load web fonts. The pane beside the story plays the latest story film.
+							The other videos are the rendered files.
 						</p>
 					</div>
 				</div>

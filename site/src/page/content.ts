@@ -6,7 +6,7 @@ export const hero = {
 	titleEm: "notes.",
 	lede: "Bumpy is a local-first sidekick for Obsidian. The vault stays the source of truth, and notes stay ordinary Markdown. Proposed edits are shown first. Nothing is written until you apply or create the reviewed result.",
 	filmNote:
-		"The pane on the right is drawn in the browser and follows the section you are reading. The rendered films are under Videos.",
+		"The pane on the right is Maya's next move, the latest story film. The other rendered films are under Videos.",
 };
 
 export const principles = [
@@ -31,7 +31,7 @@ export const story: Record<
 	opening: {
 		title: "Notes stay notes.",
 		paragraphs: [
-			"Scroll this story and the film holds the scene you are reading. Press play when you want it to run on its own.",
+			"The story film plays in the pane beside this note. Press play when you want it to run.",
 			"Commands live in the command palette. Setup can fill the provider, the URL, and a starting model. When Ollama is already running, it can download a model.",
 		],
 	},
